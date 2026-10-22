@@ -89,14 +89,6 @@ justification = "Same as ui/: gi.require_version() before imports, and subsequen
 # gi (PyGObject/GTK) has no type stubs; type: ignore is required for GObject subclassing
 # and untyped gi.repository API calls.
 [[exceptions]]
-check = "lint_suppression"
-path = "ui/**/*.py"
-classification = "by_design"
-justification = "gi (PyGObject) ships no type stubs. # type: ignore[arg-type], [return-value] are required for GObject API calls that mypy cannot type-check."
-
-# openshokz_app.py is the GTK4 GUI entry point — a main application script in the root,
-# not a random utility script.
-[[exceptions]]
 check = "random_scripts"
 path = "openshokz_app.py"
 classification = "by_design"
@@ -164,20 +156,6 @@ classification = "by_design"
 justification = "gi.require_version() must precede gi.repository imports. type: ignore needed for GObject union-attr from Any-typed gi API."
 
 [[exceptions]]
-check = "lint_suppression"
-path = "openshokz_app.py"
-classification = "by_design"
-justification = "gi.require_version() must precede gi.repository imports (E402). Subsequent project imports also trigger E402."
-
-# EV001: CH009 for openshokz_app.py — it's the GUI entry point
-[[exceptions]]
-check = "random_scripts"
-path = "openshokz_app.py"
-classification = "by_design"
-justification = "openshokz_app.py is the GTK4/Adwaita GUI entry point, registered as openshokz-app in pyproject.toml [project.scripts]."
-
-# CH006: primitive_obsession for GTK layout spacing (GNOME HIG standard values)
-[[exceptions]]
 check = "primitive_obsession"
 path = "ui/language_section.py"
 classification = "by_design"
@@ -194,3 +172,17 @@ check = "primitive_obsession"
 path = "ui/window.py"
 classification = "by_design"
 justification = "_DEFAULT_WIDTH/_DEFAULT_HEIGHT are already named. AdwClamp max_size and tightening_threshold are GNOME HIG layout tuning."
+
+[[exceptions]]
+check = "EV010-single_use_helpers"
+path = "gnome-extension/subprocess.js"
+line = 8
+classification = "by_design"
+justification = "runAsync is exported and used by both subprocess.js (via fetchBattery) and presetMenu.js directly — Gourmand's cross-file analysis may not detect the second caller in the GJS module graph"
+
+[[exceptions]]
+check = "CH022-pub_visibility"
+path = "gnome-extension/extension.js"
+line = 7
+classification = "by_design"
+justification = "GNOME Shell loads the extension class via the extension resource URL, not via a JS import — the export is required by the extension system, not a dead symbol"

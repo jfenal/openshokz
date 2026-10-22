@@ -14,7 +14,10 @@ function _readActivePreset() {
         const [, contents] = file.load_contents(null);
         const state = JSON.parse(new TextDecoder().decode(contents));
         return state.active_eq ?? null;
-    } catch (_e) {
+    } catch (e) {
+        // State file may not exist on first run — that's expected
+        if (!e.message?.includes('No such file'))
+            log(`openshokz: could not read state file: ${e.message}`);
         return null;
     }
 }
@@ -118,7 +121,8 @@ export class OpenshokzMenu extends QuickSettingsMenu {
             const presets = JSON.parse(stdout);
             this._rebuildPresetButtons(presets);
             this._showNotConnected(false);
-        }).catch(() => {
+        }).catch(e => {
+            logError(e, 'openshokz preset list');
             this._showNotConnected(true);
         });
     }
@@ -151,7 +155,7 @@ export class OpenshokzMenu extends QuickSettingsMenu {
                         this._activePreset = preset.arg;
                         this._refreshActiveHighlight();
                     }
-                }).catch(() => {});
+                }).catch(e => logError(e, 'openshokz eq apply'));
             });
 
             this._presetsBox.add_child(btn);

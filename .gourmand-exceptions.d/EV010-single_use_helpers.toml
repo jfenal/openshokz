@@ -1,0 +1,7 @@
+check = "EV010-single_use_helpers"
+classification = "gourmand_bug"
+
+[[locations]]
+path = "gnome-extension/subprocess.js"
+item = "runAsync"
+justification = "runAsync is used in 3 call sites in presetMenu.js plus fetchBattery — Gourmand's cross-file GJS analysis misses JS import graph; this is a false positive about single-use"

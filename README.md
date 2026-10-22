@@ -55,6 +55,32 @@ python3 -I shokz_config.py --mac A0:0C:E2:8C:BB:59 info
 python3 -I shokz_config.py --model opencomm2_2025.yaml info
 ```
 
+## GNOME Shell Extension
+
+A status area indicator showing battery % and a quick EQ preset switcher.
+
+### Install
+
+```bash
+bash gnome-extension/install.sh
+```
+
+Then restart GNOME Shell (`Alt+F2` → type `r` → Enter) and enable the extension via the **Extensions** app.
+
+### What it does
+
+- Shows `🎧 NN%` in the top bar, updating every 5 minutes
+- Click to open a popup with all EQ presets (built-in + custom)
+- Click a preset to apply it immediately
+- "Open Settings →" launches the GTK4 settings app (if installed)
+
+### Requirements
+
+- GNOME Shell 45, 46, or 47
+- `openshokz` on `$PATH`
+
+---
+
 ## Troubleshooting
 
 **"Device or resource busy"** — BlueZ auto-connected the SPP profile and is holding

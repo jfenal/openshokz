@@ -1,0 +1,7 @@
+check = "CH022-pub_visibility"
+classification = "by_design"
+
+[[locations]]
+path = "gnome-extension/extension.js"
+item = "OpenshokzExtension"
+justification = "GNOME Shell loads the extension entry point by convention via the extensions resource URL — the default export is required by the extension system, not a dead symbol"

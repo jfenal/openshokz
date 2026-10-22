@@ -25,9 +25,9 @@ export class OpenshokzIndicator extends SystemIndicator {
     }
 
     _startPolling() {
-        fetchBattery().then(b => this.updateBattery(b)).catch(() => {});
+        fetchBattery().then(b => this.updateBattery(b)).catch(e => logError(e, 'openshokz battery fetch'));
         this._pollId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 300, () => {
-            fetchBattery().then(b => this.updateBattery(b)).catch(() => {});
+            fetchBattery().then(b => this.updateBattery(b)).catch(e => logError(e, 'openshokz battery poll'));
             return GLib.SOURCE_CONTINUE;
         });
     }

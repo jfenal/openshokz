@@ -16,4 +16,5 @@ data/
 # Temp
 /tmp/
 *.tmp
+gnome-extension/.eslintcache
 .gourmand-cache/

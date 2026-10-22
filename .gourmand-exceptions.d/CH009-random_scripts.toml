@@ -14,3 +14,8 @@ justification = "Baseline: 1 violation - review and fix"
 path = "openshokz_app.py"
 justification = "GTK4/Adwaita GUI entry point for openshokz. Registered as openshokz-app in pyproject.toml [project.scripts]."
 classification = "by_design"
+
+[[locations]]
+path = "gnome-extension/extension.js"
+justification = "GNOME Shell Extension entry point — required by the extension system to be named extension.js in the extension directory. Not a random script."
+classification = "by_design"
