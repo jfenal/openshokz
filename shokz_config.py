@@ -453,6 +453,20 @@ def cmd_info(mac: str, model: ModelData, channel: int) -> None:
         s.close()
 
 
+def cmd_eq_list(model: ModelData) -> None:
+    """Print all EQ presets (built-in + custom) as JSON. No headset connection needed."""
+    eq_cfg = model.get("eq", {})
+    presets = eq_cfg.get("presets", {})
+    result: list[dict[str, object]] = []
+    for key, p in presets.items():
+        result.append({"name": p.get("label", key), "builtin": True, "arg": key})
+    for custom in _load_presets():
+        result.append(
+            {"name": custom.get("name", ""), "builtin": False, "arg": custom.get("name", "")}
+        )
+    print(json.dumps(result, indent=2))
+
+
 def cmd_eq(
     mac: str,
     model: ModelData,
@@ -600,6 +614,12 @@ def main() -> None:
     args: list[str] = getattr(namespace, "args", []) or []
 
     try:
+        # eq list --json doesn't need a headset connection; handle before _resolve
+        if command == "eq" and args and args[0] == "list":
+            _, model, _ = _resolve(mac_arg, model_arg)
+            cmd_eq_list(model)
+            return
+
         mac, model, channel = _resolve(mac_arg, model_arg)
 
         match command:

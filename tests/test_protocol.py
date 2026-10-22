@@ -4,6 +4,7 @@ All tests run without hardware — they verify the packet builder,
 CRC, parser, and model loader against values from live captures.
 """
 
+import json
 import struct
 import sys
 import textwrap
@@ -25,6 +26,7 @@ from shokz_config import (
     _load_state,
     _save_presets,
     _save_state,
+    cmd_eq_list,
 )
 
 
@@ -437,3 +439,26 @@ class TestPresetStorage:
         monkeypatch.setenv("HOME", str(tmp_path))
         _save_state("standard")
         assert not (_config_dir() / "state.json.tmp").exists()
+
+
+class TestEqList:
+    def test_list_builtin_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
+        cmd_eq_list(model)
+        out = json.loads(capsys.readouterr().out)
+        assert len(out) == 2
+        assert out[0] == {"name": "Standard", "builtin": True, "arg": "standard"}
+        assert out[1] == {"name": "Vocal Booster", "builtin": True, "arg": "vocal"}
+
+    def test_list_includes_custom(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
+        model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
+        cmd_eq_list(model)
+        out = json.loads(capsys.readouterr().out)
+        assert out[2] == {"name": "My Bass", "builtin": False, "arg": "My Bass"}
