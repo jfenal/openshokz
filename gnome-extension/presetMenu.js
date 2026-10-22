@@ -31,6 +31,7 @@ export class OpenshokzMenu extends QuickSettingsMenu {
         this._monitor = null;
         this._connected = false;
 
+        this._loading = false; // debounce: prevents concurrent _loadPresets calls
         this._buildHeader();
         this._buildPresetList();
         this._buildFooter();
@@ -113,7 +114,11 @@ export class OpenshokzMenu extends QuickSettingsMenu {
     }
 
     _loadPresets() {
+        if (this._loading)
+            return; // already in flight — ignore rapid open/close
+        this._loading = true;
         runAsync(['openshokz', 'eq', 'list', '--json']).then(({ok, stdout}) => {
+            this._loading = false;
             if (!ok) {
                 this._showNotConnected(true);
                 return;
@@ -122,6 +127,7 @@ export class OpenshokzMenu extends QuickSettingsMenu {
             this._rebuildPresetButtons(presets);
             this._showNotConnected(false);
         }).catch(e => {
+            this._loading = false;
             logError(e, 'openshokz preset list');
             this._showNotConnected(true);
         });

@@ -410,7 +410,8 @@ def _resolve(mac_arg: str | None, model_arg: str | None) -> tuple[str, ModelData
     return mac, model, channel
 
 
-def cmd_info(mac: str, model: ModelData, channel: int) -> None:
+def cmd_info(mac: str, model: ModelData, channel: int, short: bool = False) -> None:
+    """Print device info. short=True prints only Model + Battery (for connectivity checks)."""
     s = connect(mac, channel)
     try:
         firmware = _handshake(s)
@@ -427,6 +428,9 @@ def cmd_info(mac: str, model: ModelData, channel: int) -> None:
                     level = payload[1]
                     pct = min(100, (level + 1) * (100 // (batt_scale + 1)))
                     print(f"Battery  : {level}/{batt_scale} ({pct}%)")
+
+        if short:
+            return
 
         di_cfg = model.get("device_info", {})
         di_cmd = di_cfg.get("command", -1)
@@ -668,12 +672,16 @@ def main() -> None:
         help="Command to run (omit for interactive menu)",
     )
     _ = parser.add_argument("args", nargs="*", help="Command arguments")
+    _ = parser.add_argument(
+        "--short", action="store_true", help="info: print only Model and Battery"
+    )
     namespace = parser.parse_args()
 
     mac_arg: str | None = getattr(namespace, "mac", None)
     model_arg: str | None = getattr(namespace, "model", None)
     command: str | None = getattr(namespace, "command", None)
     args: list[str] = getattr(namespace, "args", []) or []
+    short_flag: bool = getattr(namespace, "short", False)
 
     try:
         # Commands that don't need a headset connection; handle before _resolve
@@ -702,7 +710,7 @@ def main() -> None:
             case None:
                 interactive(mac, model, channel)
             case "info":
-                cmd_info(mac, model, channel)
+                cmd_info(mac, model, channel, short=short_flag)
             case "eq":
                 if not args:
                     parser.error("eq requires a preset name: standard|vocal|custom [bands...]")
