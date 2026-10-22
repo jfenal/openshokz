@@ -10,6 +10,7 @@ export class OpenshokzIndicator extends SystemIndicator {
         this._indicatorLabel = this._addIndicator();
         this._indicatorLabel.text = '🎧 --';
         this._pollId = null;
+        this._alive = true; // guard against callbacks after destroy()
 
         // batteryRef is shared with the menu so it can show current battery text
         this._batteryRef = {text: '--'};
@@ -20,6 +21,8 @@ export class OpenshokzIndicator extends SystemIndicator {
     }
 
     updateBattery(text) {
+        if (!this._alive)
+            return;
         this._indicatorLabel.text = `🎧 ${text}`;
         this._batteryRef.text = text;
     }
@@ -33,6 +36,7 @@ export class OpenshokzIndicator extends SystemIndicator {
     }
 
     destroy() {
+        this._alive = false; // prevent in-flight async callbacks from touching destroyed widgets
         if (this._pollId !== null) {
             GLib.source_remove(this._pollId);
             this._pollId = null;
