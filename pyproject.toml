@@ -1,5 +1,5 @@
 [project]
-name = "shokz-config"
+name = "openshokz"
 version = "0.1.0"
 description = "Open-source configuration tool for Shokz Bluetooth headsets"
 readme = "README.md"
@@ -18,7 +18,7 @@ dev = [
 ]
 
 [project.scripts]
-shokz-config = "shokz_config:main"
+openshokz = "shokz_config:main"
 shokz-probe = "scripts.probe_model:main"
 
 [tool.ruff]

@@ -1,4 +1,4 @@
-# shokz-config
+# openshokz
 
 Open-source command-line configurator for Shokz Bluetooth headsets.
 
