@@ -1,11 +1,25 @@
+import GLib from 'gi://GLib';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
-import {fetchBattery} from './subprocess.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+
+import {OpenshokzIndicator} from './indicator.js';
 
 export default class OpenshokzExtension extends Extension {
     enable() {
-        // Smoke-test: log battery on enable (visible in journalctl)
-        fetchBattery().then(b => log(`openshokz: battery ${b}`)).catch(() => {});
+        if (!GLib.find_program_in_path('openshokz')) {
+            log('openshokz: CLI not found on PATH, extension inactive');
+            return;
+        }
+
+        this._indicator = new OpenshokzIndicator();
+        Main.panel.statusArea['openshokz'] = this._indicator;
+        Main.panel._rightBox.insert_child_at_index(this._indicator, 0);
     }
 
-    disable() {}
+    disable() {
+        if (this._indicator) {
+            this._indicator.destroy();
+            this._indicator = null;
+        }
+    }
 }
