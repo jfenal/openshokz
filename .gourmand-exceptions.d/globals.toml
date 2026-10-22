@@ -1,0 +1,5 @@
+# [global]
+# excluded_paths = [
+#   "vendor/**",
+#   "tests/fixtures/**",
+# ]

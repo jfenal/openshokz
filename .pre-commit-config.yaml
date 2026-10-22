@@ -1,0 +1,34 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff
+        stages: [pre-commit]
+        args: [--fix]
+      - id: ruff-format
+        stages: [pre-commit]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: python3 -m mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [shokz_config.py, protocol.py, scripts/, tests/]
+
+      - id: basedpyright
+        name: basedpyright
+        entry: python3 -m basedpyright
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [--pythonpath, /usr/bin/python3, shokz_config.py, protocol.py, scripts/, tests/]
+
+      - id: pytest
+        name: pytest
+        entry: python3 -m pytest
+        language: system
+        pass_filenames: false
+        args: [tests/, -q]

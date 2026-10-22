@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Type checkers
+.mypy_cache/
+.pyright/
+
+# Captures (large binary files — keep structure, not content)
+data/
+
+# Temp
+/tmp/
+*.tmp
+.gourmand-cache/

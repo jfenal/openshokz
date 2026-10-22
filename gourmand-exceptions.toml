@@ -1,0 +1,72 @@
+# Gourmand exceptions — baseline violations with by_design justifications
+# Remove entries as violations are genuinely fixed.
+
+
+[[exceptions]]
+check = "CH009-random_scripts"
+path = "shokz_config.py"
+classification = "by_design"
+justification = "shokz_config.py is the project's primary CLI entry point — root placement is intentional project structure alongside models/ and protocol.py"
+
+[[exceptions]]
+check = "CH006-primitive_obsession"
+path = "scripts/probe_model.py"
+item = "_write_template"
+classification = "by_design"
+justification = "max_battery_level = 15 names the magic number; Gourmand fires on the RHS literal even when the value is already named by a local constant"
+
+[[exceptions]]
+check = "CH006-primitive_obsession"
+path = "shokz_config.py"
+item = "cmd_eq"
+classification = "by_design"
+justification = "byte_mask = 0xFF names the magic number; Gourmand fires on the RHS literal even when the value is already named by a local constant"
+
+[[exceptions]]
+check = "EV004-redundant_error_handling"
+path = "scripts/send_cmd.py"
+item = "main"
+classification = "by_design"
+justification = "send_cmd.py is a developer diagnostic tool; printing the error before exit is the correct UX for a CLI debug script"
+
+[[exceptions]]
+check = "CH020-direct_exit"
+path = "scripts/probe_model.py"
+item = "main"
+classification = "by_design"
+justification = "sys.exit() in main() of a CLI entry-point script is correct Python; probe_model.py is not a library"
+
+[[exceptions]]
+check = "CH020-direct_exit"
+path = "scripts/send_cmd.py"
+item = "main"
+classification = "by_design"
+justification = "sys.exit() in main() of a CLI entry-point script is correct Python; send_cmd.py is not a library"
+
+[[exceptions]]
+check = "CH020-direct_exit"
+path = "shokz_config.py"
+item = "main"
+classification = "by_design"
+justification = "sys.exit() in main() after catching ShokzError is the intended pattern — shokz_config.py is a CLI entry point, not a library"
+
+[[exceptions]]
+check = "CH017-conditional_wrapper"
+path = "shokz_config.py"
+item = "_as_int"
+classification = "by_design"
+justification = "_as_int() is a type-coercion normaliser for YAML values; the isinstance guard IS its purpose — moving it to all call sites would duplicate type-narrowing logic everywhere"
+
+[[exceptions]]
+check = "IF001-linter_configuration"
+path = ".pre-commit-config.yaml"
+item = "ruff-check hook"
+classification = "by_design"
+justification = "ruff hooks use stages: [pre-commit] which is correct; Gourmand does not recognise the YAML list format for the stages field"
+
+[[exceptions]]
+check = "IF001-linter_configuration"
+path = "pyproject.toml"
+item = "ruff::C901"
+classification = "by_design"
+justification = "C901 is configured via [tool.ruff.lint.mccabe] max-complexity = 15; the gate is active at threshold 15, not the bare C901 default of 10"
