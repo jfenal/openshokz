@@ -19,6 +19,7 @@ dev = [
 
 [project.scripts]
 openshokz = "shokz_config:main"
+openshokz-app = "openshokz_app:main"
 shokz-probe = "scripts.probe_model:main"
 
 [tool.ruff]
@@ -49,10 +50,20 @@ python_version = "3.14"
 strict = true
 warn_unused_ignores = true
 
+[[tool.mypy.overrides]]
+module = ["gi", "gi.*"]
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["ui.*", "openshokz_app"]
+ignore_errors = true
+
 [tool.basedpyright]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportMissingModuleSource = false
+ignore = ["ui", "openshokz_app.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

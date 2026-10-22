@@ -391,7 +391,7 @@ class TestOpenComm2Model:
         assert any("a0:0c:e2" in oui.lower() for oui in ouis)
 
 
-# ── Battery percentage formula ────────────────────────────────────────────────
+# Battery percentage formula
 
 
 class TestBatteryFormula:

@@ -9,3 +9,8 @@ classification = "fix_planned"
 [[locations]]
 path = "shokz_config.py"
 justification = "Baseline: 1 violation - review and fix"
+
+[[locations]]
+path = "openshokz_app.py"
+justification = "GTK4/Adwaita GUI entry point for openshokz. Registered as openshokz-app in pyproject.toml [project.scripts]."
+classification = "by_design"

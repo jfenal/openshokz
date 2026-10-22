@@ -45,3 +45,35 @@ justification = "Baseline: 1 violation - review and fix"
 path = "tests/test_protocol.py"
 item = "test_vocal_eq_shape"
 justification = "Baseline: 1 violation - review and fix"
+
+# PyGObject requires gi.require_version() before gi.repository imports (E402).
+# gi has no type stubs, so type: ignore is required for GObject API calls.
+[[locations]]
+path = "openshokz_app.py"
+justification = "gi.require_version() before gi.repository imports (canonical PyGObject pattern). E402 unavoidable."
+classification = "by_design"
+
+[[locations]]
+path = "ui/device_section.py"
+justification = "gi.require_version() before gi.repository imports (canonical PyGObject pattern). E402 unavoidable."
+classification = "by_design"
+
+[[locations]]
+path = "ui/edit_preset_page.py"
+justification = "gi.require_version() before gi.repository imports (canonical PyGObject pattern). E402 unavoidable."
+classification = "by_design"
+
+[[locations]]
+path = "ui/eq_section.py"
+justification = "gi.require_version() before gi.repository imports (E402). type: ignore needed for untyped shokz_config import."
+classification = "by_design"
+
+[[locations]]
+path = "ui/language_section.py"
+justification = "gi.require_version() before gi.repository imports (canonical PyGObject pattern). E402 unavoidable."
+classification = "by_design"
+
+[[locations]]
+path = "ui/window.py"
+justification = "gi.require_version() before gi.repository imports (E402). type: ignore needed for GObject union-attr from Any-typed gi API."
+classification = "by_design"

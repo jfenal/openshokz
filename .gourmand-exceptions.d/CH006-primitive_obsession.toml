@@ -105,3 +105,23 @@ justification = "Baseline: 1 violation - review and fix"
 path = "shokz_config.py"
 item = "cmd_info"
 justification = "Baseline: 2 violations - review and fix"
+
+[[locations]]
+path = "ui/edit_preset_page.py"
+justification = "12/24px margins and 160px slider width are GNOME HIG standard values. Not meaningful to name."
+classification = "by_design"
+
+[[locations]]
+path = "ui/eq_section.py"
+justification = "6/8px FlowBox spacing follows GNOME HIG. Not meaningful to name."
+classification = "by_design"
+
+[[locations]]
+path = "ui/language_section.py"
+justification = "GTK layout values follow GNOME HIG. Not meaningful to name."
+classification = "by_design"
+
+[[locations]]
+path = "ui/window.py"
+justification = "AdwClamp layout tuning values. _DEFAULT_WIDTH/_DEFAULT_HEIGHT already named; remaining values are GNOME HIG tuning."
+classification = "by_design"

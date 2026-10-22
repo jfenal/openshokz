@@ -1,0 +1,13 @@
+check = "CQ002-dead_code_markers"
+classification = "by_design"
+
+[[locations]]
+path = "ui/eq_section.py"
+item = "EqSection::_on_chip_toggled::_preset"
+justification = "GTK signal callbacks must have correct arity. _preset is required by the connect() signature."
+classification = "by_design"
+
+[[locations]]
+path = "ui/language_section.py"
+justification = "GTK DragSource/DropTarget signal callbacks require all position parameters (_x, _y, _source, _target) even when unused."
+classification = "by_design"

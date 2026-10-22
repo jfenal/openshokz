@@ -70,3 +70,127 @@ path = "pyproject.toml"
 item = "ruff::C901"
 classification = "by_design"
 justification = "C901 is configured via [tool.ruff.lint.mccabe] max-complexity = 15; the gate is active at threshold 15, not the bare C901 default of 10"
+
+# UI files: PyGObject requires gi.require_version() before gi.repository imports,
+# which ruff flags as E402. These # noqa: E402 comments are the canonical pattern
+# for all PyGObject applications.
+[[exceptions]]
+check = "lint_suppression"
+path = "ui/**/*.py"
+classification = "by_design"
+justification = "PyGObject requires gi.require_version() before gi.repository imports, producing unavoidable E402 violations. # noqa: E402 is the canonical PyGObject pattern."
+
+[[exceptions]]
+check = "lint_suppression"
+path = "openshokz_app.py"
+classification = "by_design"
+justification = "Same as ui/: gi.require_version() before imports, and subsequent project imports trigger E402."
+
+# gi (PyGObject/GTK) has no type stubs; type: ignore is required for GObject subclassing
+# and untyped gi.repository API calls.
+[[exceptions]]
+check = "lint_suppression"
+path = "ui/**/*.py"
+classification = "by_design"
+justification = "gi (PyGObject) ships no type stubs. # type: ignore[arg-type], [return-value] are required for GObject API calls that mypy cannot type-check."
+
+# openshokz_app.py is the GTK4 GUI entry point — a main application script in the root,
+# not a random utility script.
+[[exceptions]]
+check = "random_scripts"
+path = "openshokz_app.py"
+classification = "by_design"
+justification = "openshokz_app.py is the GTK4/Adwaita GUI entry point for the project, listed as openshokz-app in pyproject.toml [project.scripts]."
+
+# GTK layout margins in edit_preset_page.py use GNOME HIG standard values (12, 24px).
+# Naming every margin constant would add noise without improving readability.
+[[exceptions]]
+check = "primitive_obsession"
+path = "ui/edit_preset_page.py"
+classification = "by_design"
+justification = "12px and 24px are GNOME HIG standard content margins. Naming each margin constant would obscure rather than clarify intent."
+
+# Slider width 160px in edit_preset_page is a minimum comfortable touch target.
+[[exceptions]]
+check = "primitive_obsession"
+path = "ui/edit_preset_page.py"
+item = "__init__"
+classification = "by_design"
+justification = "160px is the minimum usable slider width on a GTK4 preferences page. Not a semantic constant."
+
+# GTK signal callbacks must have the correct arity; unused _ parameters are required.
+[[exceptions]]
+check = "dead_code_markers"
+path = "ui/eq_section.py"
+item = "EqSection::_on_chip_toggled::_preset"
+classification = "by_design"
+justification = "GTK signal callback arity is fixed; _preset is required by the connect() call signature."
+
+[[exceptions]]
+check = "dead_code_markers"
+path = "ui/language_section.py"
+classification = "by_design"
+justification = "GTK DragSource/DropTarget signal callbacks require all position parameters (_x, _y, _source, _target) even when unused."
+
+# EV001: E402 suppression required for PyGObject (gi.require_version before gi.repository imports)
+[[exceptions]]
+check = "lint_suppression"
+path = "ui/device_section.py"
+classification = "by_design"
+justification = "gi.require_version() must precede gi.repository imports. # noqa: E402 is the canonical PyGObject pattern."
+
+[[exceptions]]
+check = "lint_suppression"
+path = "ui/edit_preset_page.py"
+classification = "by_design"
+justification = "gi.require_version() must precede gi.repository imports. # noqa: E402 is the canonical PyGObject pattern."
+
+[[exceptions]]
+check = "lint_suppression"
+path = "ui/eq_section.py"
+classification = "by_design"
+justification = "gi.require_version() precedes gi.repository imports. type: ignore needed for untyped shokz_config module import."
+
+[[exceptions]]
+check = "lint_suppression"
+path = "ui/language_section.py"
+classification = "by_design"
+justification = "gi.require_version() must precede gi.repository imports. # noqa: E402 is the canonical PyGObject pattern."
+
+[[exceptions]]
+check = "lint_suppression"
+path = "ui/window.py"
+classification = "by_design"
+justification = "gi.require_version() must precede gi.repository imports. type: ignore needed for GObject union-attr from Any-typed gi API."
+
+[[exceptions]]
+check = "lint_suppression"
+path = "openshokz_app.py"
+classification = "by_design"
+justification = "gi.require_version() must precede gi.repository imports (E402). Subsequent project imports also trigger E402."
+
+# EV001: CH009 for openshokz_app.py — it's the GUI entry point
+[[exceptions]]
+check = "random_scripts"
+path = "openshokz_app.py"
+classification = "by_design"
+justification = "openshokz_app.py is the GTK4/Adwaita GUI entry point, registered as openshokz-app in pyproject.toml [project.scripts]."
+
+# CH006: primitive_obsession for GTK layout spacing (GNOME HIG standard values)
+[[exceptions]]
+check = "primitive_obsession"
+path = "ui/language_section.py"
+classification = "by_design"
+justification = "GTK layout constants (spacing, margins) follow GNOME HIG. Naming each margin adds noise without clarity."
+
+[[exceptions]]
+check = "primitive_obsession"
+path = "ui/eq_section.py"
+classification = "by_design"
+justification = "GTK FlowBox spacing constants (6, 8px) follow GNOME HIG. Not semantically meaningful to name."
+
+[[exceptions]]
+check = "primitive_obsession"
+path = "ui/window.py"
+classification = "by_design"
+justification = "_DEFAULT_WIDTH/_DEFAULT_HEIGHT are already named. AdwClamp max_size and tightening_threshold are GNOME HIG layout tuning."
