@@ -485,6 +485,29 @@ def _resolve_preset_name(name: str, model: ModelData) -> tuple[int, list[int]]:
     raise ShokzError(f"Unknown preset '{name}'. Run 'eq list --json' to see available presets.")
 
 
+def cmd_preset_add(name: str, bands: list[int]) -> None:
+    """Save a custom EQ preset. Max 3 custom presets. No headset connection needed."""
+    presets = _load_presets()
+    if len(presets) >= 3:
+        raise ShokzError(
+            f"Cannot add preset: maximum 3 custom presets allowed (have {len(presets)})"
+        )
+    _validate_bands(bands)
+    presets.append({"name": name, "bands": bands})
+    _save_presets(presets)
+    print(f"Preset '{name}' saved.")
+
+
+def cmd_preset_delete(name: str) -> None:
+    """Remove a custom EQ preset by name. No headset connection needed."""
+    presets = _load_presets()
+    filtered = [p for p in presets if p.get("name") != name]
+    if len(filtered) == len(presets):
+        raise ShokzError(f"Preset '{name}' not found.")
+    _save_presets(filtered)
+    print(f"Preset '{name}' deleted.")
+
+
 def cmd_eq_list(model: ModelData) -> None:
     """Print all EQ presets (built-in + custom) as JSON. No headset connection needed."""
     eq_cfg = model.get("eq", {})
@@ -653,11 +676,25 @@ def main() -> None:
     args: list[str] = getattr(namespace, "args", []) or []
 
     try:
-        # eq list --json doesn't need a headset connection; handle before _resolve
+        # Commands that don't need a headset connection; handle before _resolve
         if command == "eq" and args and args[0] == "list":
             _, model, _ = _resolve(mac_arg, model_arg)
             cmd_eq_list(model)
             return
+        if command == "eq" and len(args) >= 2 and args[0] == "preset":
+            sub = args[1]
+            if sub == "add" and len(args) >= 4:
+                preset_name = args[2]
+                try:
+                    bands = [int(x) for x in args[3:10]]
+                except ValueError:
+                    parser.error("eq preset add needs integer band values")
+                cmd_preset_add(preset_name, bands)
+                return
+            if sub == "delete" and len(args) >= 3:
+                cmd_preset_delete(args[2])
+                return
+            parser.error("Usage: eq preset add <name> b0..b6 | eq preset delete <name>")
 
         mac, model, channel = _resolve(mac_arg, model_arg)
 
@@ -677,7 +714,7 @@ def main() -> None:
                         parser.error("Custom EQ needs integer band values")
                     cmd_eq(mac, model, channel, "custom", custom_bands)
                 else:
-                    cmd_eq(mac, model, channel, preset)
+                    cmd_eq(mac, model, channel, args[0])
             case "lang":
                 if not args:
                     parser.error("lang requires at least one language code")

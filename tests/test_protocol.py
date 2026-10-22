@@ -30,6 +30,8 @@ from shokz_config import (
     _save_state,
     _validate_bands,
     cmd_eq_list,
+    cmd_preset_add,
+    cmd_preset_delete,
 )
 
 
@@ -492,3 +494,31 @@ class TestNamedPreset:
     def test_band_out_of_range_raises(self) -> None:
         with pytest.raises(ShokzError, match="band value"):
             _validate_bands([13, 0, 0, 0, 0, 0, 0])
+
+
+class TestPresetManagement:
+    def test_add_preset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        cmd_preset_add("My Bass", [4, 0, 0, 0, 0, 0, 0])
+        assert _load_presets()[0]["name"] == "My Bass"
+
+    def test_add_fourth_preset_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_presets([{"name": f"P{i}", "bands": [0] * 7} for i in range(3)])
+        with pytest.raises(ShokzError, match="maximum 3"):
+            cmd_preset_add("P4", [0] * 7)
+
+    def test_delete_preset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
+        cmd_preset_delete("My Bass")
+        assert _load_presets() == []
+
+    def test_delete_nonexistent_raises(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        with pytest.raises(ShokzError, match="not found"):
+            cmd_preset_delete("Ghost")
