@@ -15,7 +15,17 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from protocol import build_packet, crc16_maxim, parse_packet
-from shokz_config import ModelData, _as_int, _as_str, _coerce_model
+from shokz_config import (
+    ModelData,
+    _as_int,
+    _as_str,
+    _coerce_model,
+    _config_dir,
+    _load_presets,
+    _load_state,
+    _save_presets,
+    _save_state,
+)
 
 
 def _firmware_query_inner() -> bytes:
@@ -403,3 +413,27 @@ class TestBatteryFormula:
     def test_capped_at_100(self) -> None:
         assert self._pct(9) == 100
         assert self._pct(9) <= 100
+
+
+class TestPresetStorage:
+    def test_load_presets_missing_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        assert _load_presets() == []
+
+    def test_save_and_load_presets(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        presets: list[dict[str, object]] = [{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}]
+        _save_presets(presets)
+        assert _load_presets() == presets
+
+    def test_save_state_and_load(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_state("vocal")
+        assert _load_state()["active_eq"] == "vocal"
+
+    def test_save_state_atomic(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_state("standard")
+        assert not (_config_dir() / "state.json.tmp").exists()

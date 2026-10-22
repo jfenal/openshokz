@@ -18,10 +18,12 @@ Usage (non-interactive):
 
 import argparse
 import contextlib
+import json
 import socket
 import struct
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -43,6 +45,45 @@ from protocol import (
 
 class ShokzError(Exception):
     """Raised for user-facing configuration errors; caught in main() for clean exit."""
+
+
+def _config_dir() -> Path:
+    """Return ~/.config/openshokz, creating it if absent."""
+    d = Path.home() / ".config" / "openshokz"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _load_presets() -> list[dict[str, object]]:
+    """Read custom presets from presets.json; return [] if absent."""
+    path = _config_dir() / "presets.json"
+    if not path.exists():
+        return []
+    return list(json.loads(path.read_text()))
+
+
+def _save_presets(presets: list[dict[str, object]]) -> None:
+    """Atomically write custom presets to presets.json."""
+    path = _config_dir() / "presets.json"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(presets, indent=2))
+    tmp.rename(path)
+
+
+def _load_state() -> dict[str, str]:
+    """Read state.json; return {} if absent."""
+    path = _config_dir() / "state.json"
+    if not path.exists():
+        return {}
+    return dict(json.loads(path.read_text()))
+
+
+def _save_state(active_eq: str) -> None:
+    """Atomically write active EQ preset name to state.json."""
+    path = _config_dir() / "state.json"
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({"active_eq": active_eq, "updated": datetime.now().isoformat()}))
+    tmp.rename(path)
 
 
 class EqPreset(TypedDict, total=False):
