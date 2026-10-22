@@ -23,6 +23,12 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         self.set_title("openshokz")
         self.set_default_size(_DEFAULT_WIDTH, _DEFAULT_HEIGHT)
 
+        # NavigationView lets EqSection push EditPresetPage
+        self._nav_view = Adw.NavigationView()
+
+        main_page = Adw.NavigationPage()
+        main_page.set_title("openshokz")
+
         toolbar_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
         toolbar_view.add_top_bar(header)
@@ -53,7 +59,9 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         outer_box.append(scroll)
 
         toolbar_view.set_content(outer_box)
-        self.set_content(toolbar_view)
+        main_page.set_child(toolbar_view)
+        self._nav_view.add(main_page)
+        self.set_content(self._nav_view)
 
         self._sections: list[object] = []
         self._connected = False
