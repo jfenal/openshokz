@@ -453,6 +453,38 @@ def cmd_info(mac: str, model: ModelData, channel: int) -> None:
         s.close()
 
 
+def _validate_bands(bands: list[int]) -> None:
+    """Raise ShokzError if any band value is outside -12..12."""
+    for b in bands:
+        if b < -12 or b > 12:
+            raise ShokzError(f"band value {b} out of range -12..12")
+
+
+def _resolve_preset_name(name: str, model: ModelData) -> tuple[int, list[int]]:
+    """Resolve a preset name to (preset_id, bands).
+
+    Built-in presets (matched by key or label) take precedence over custom.
+    Raises ShokzError if the name is not found.
+    """
+    eq_cfg = model.get("eq", {})
+    presets = eq_cfg.get("presets", {})
+    # Check built-in by key
+    if name in presets:
+        p = presets[name]
+        return p.get("id", 1), list(p.get("bands", []))
+    # Check built-in by label
+    for p in presets.values():
+        if p.get("label", "") == name:
+            return p.get("id", 1), list(p.get("bands", []))
+    # Check custom presets
+    custom_preset_id: int = eq_cfg.get("custom_preset_id", 1)
+    for custom in _load_presets():
+        if custom.get("name") == name:
+            bands_raw = custom.get("bands", [])
+            return custom_preset_id, [_as_int(b) for b in cast(list[object], bands_raw)]
+    raise ShokzError(f"Unknown preset '{name}'. Run 'eq list --json' to see available presets.")
+
+
 def cmd_eq_list(model: ModelData) -> None:
     """Print all EQ presets (built-in + custom) as JSON. No headset connection needed."""
     eq_cfg = model.get("eq", {})
@@ -485,15 +517,21 @@ def cmd_eq(
         first_preset = next(iter(presets.values()), EqPreset())
         preset_id: int = eq_cfg.get("custom_preset_id", first_preset.get("id", 1))
         bands = custom_bands[:7] + [0] * max(0, 7 - len(custom_bands))
+        _validate_bands(bands)
         label = "custom"
+        state_name = "custom"
     elif preset_name in presets:
         p = presets[preset_name]
         preset_id = p.get("id", 1)
         bands = list(p.get("bands", []))
         label = p.get("label", preset_name)
+        state_name = preset_name
     else:
-        known = [*list(presets.keys()), "custom"]
-        raise ShokzError(f"Unknown EQ preset '{preset_name}'. Use: {', '.join(known)}")
+        # Try named custom preset lookup (named presets not in built-in list)
+        preset_id, bands = _resolve_preset_name(preset_name, model)
+        _validate_bands(bands)
+        label = preset_name
+        state_name = preset_name
 
     byte_mask = 0xFF
     payload = bytes([preset_id & byte_mask] + [b & byte_mask for b in bands])
@@ -504,6 +542,7 @@ def cmd_eq(
         if resp == b"\x00\x00\x00\x00":
             band_str = ", ".join(f"{b:+d}" if b else "0" for b in bands)
             print(f"EQ set: {label} (preset_id={preset_id:#x}, bands=[{band_str}])")
+            _save_state(state_name)
         else:
             print(f"Unexpected response: {resp.hex()}")
     finally:

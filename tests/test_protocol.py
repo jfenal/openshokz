@@ -18,14 +18,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from protocol import build_packet, crc16_maxim, parse_packet
 from shokz_config import (
     ModelData,
+    ShokzError,
     _as_int,
     _as_str,
     _coerce_model,
     _config_dir,
     _load_presets,
     _load_state,
+    _resolve_preset_name,
     _save_presets,
     _save_state,
+    _validate_bands,
     cmd_eq_list,
 )
 
@@ -462,3 +465,30 @@ class TestEqList:
         cmd_eq_list(model)
         out = json.loads(capsys.readouterr().out)
         assert out[2] == {"name": "My Bass", "builtin": False, "arg": "My Bass"}
+
+
+class TestNamedPreset:
+    def test_named_builtin_resolves(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
+        preset_id, bands = _resolve_preset_name("standard", model)
+        assert preset_id == 1
+        assert bands == [0, 0, 0, 0, 0, 0, 0]
+
+    def test_named_custom_resolves(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
+        model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
+        preset_id, bands = _resolve_preset_name("My Bass", model)
+        assert preset_id == 1
+        assert bands == [4, 0, 0, 0, 0, 0, 0]
+
+    def test_unknown_preset_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
+        with pytest.raises(ShokzError, match="Unknown preset"):
+            _resolve_preset_name("doesnotexist", model)
+
+    def test_band_out_of_range_raises(self) -> None:
+        with pytest.raises(ShokzError, match="band value"):
+            _validate_bands([13, 0, 0, 0, 0, 0, 0])
