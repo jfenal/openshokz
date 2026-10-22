@@ -7,7 +7,7 @@ import gi
 gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 
-from gi.repository import Adw  # noqa: E402
+from gi.repository import Adw, Gtk  # noqa: E402
 
 from ui.headset import run_openshokz  # noqa: E402
 
@@ -67,6 +67,8 @@ class DeviceSection(Adw.PreferencesGroup):
         self._bat_row = Adw.ActionRow()
         self._bat_row.set_title("Battery")
         self._bat_row.set_subtitle("—")
+        self._bat_icon = Gtk.Image.new_from_icon_name("battery-missing-symbolic")
+        self._bat_row.add_prefix(self._bat_icon)
         self.add(self._bat_row)
 
         self._dev_row = Adw.ActionRow()
@@ -89,4 +91,9 @@ class DeviceSection(Adw.PreferencesGroup):
         self._fw_row.set_subtitle(info.get("firmware", "—"))
         bat = info.get("battery", "—")
         self._bat_row.set_subtitle(bat)
+        try:
+            pct = int(bat.split("(")[1].rstrip("%)"))
+            self._bat_icon.set_from_icon_name(_battery_icon(pct))
+        except (IndexError, ValueError):
+            self._bat_icon.set_from_icon_name("battery-missing-symbolic")
         self._dev_row.set_subtitle(info.get("devices", "—"))

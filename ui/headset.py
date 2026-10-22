@@ -9,9 +9,16 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
-_SUBPROCESS_TIMEOUT = 15  # seconds — long enough for 2s headset settle + command
+import gi
+
+gi.require_version("GLib", "2.0")
+from gi.repository import GLib  # noqa: E402
+
+_SUBPROCESS_TIMEOUT = 15  # seconds — long enough for 2 s headset settle + command
 _SCRIPT_PATH = Path(__file__).parent.parent / "shokz_config.py"
 
 
@@ -23,7 +30,7 @@ def _cli_argv() -> list[str]:
 
 
 def run_openshokz(*args: str) -> tuple[bool, str]:
-    """Run `openshokz <args>` and return (success, stdout)."""
+    """Run `openshokz <args>` synchronously. Use for startup/refresh only."""
     try:
         result = subprocess.run(
             _cli_argv() + list(args),
@@ -34,6 +41,21 @@ def run_openshokz(*args: str) -> tuple[bool, str]:
         return result.returncode == 0, result.stdout
     except Exception as exc:
         return False, str(exc)
+
+
+def run_openshokz_async(
+    callback: Callable[[bool, str], None],
+    *args: str,
+) -> None:
+    """Run `openshokz <args>` in a background thread; call callback(ok, stdout)
+    on the GLib main loop when done. Use for user-initiated actions to keep
+    the UI responsive during the ~3 s headset handshake."""
+
+    def _worker() -> None:
+        ok, out = run_openshokz(*args)
+        GLib.idle_add(callback, ok, out)
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 def check_connected() -> bool:

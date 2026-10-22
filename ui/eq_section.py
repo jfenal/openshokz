@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,22 +13,19 @@ gi.require_version("Gtk", "4.0")
 
 from gi.repository import Adw, Gtk  # noqa: E402
 
-from ui.headset import run_openshokz  # noqa: E402
+from ui.headset import run_openshokz, run_openshokz_async  # noqa: E402
 
 if TYPE_CHECKING:
     from ui.window import OpenshokzWindow
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from shokz_config import _load_state as _load_headset_state  # type: ignore[import]  # noqa: E402
+_STATE_FILE = Path.home() / ".config" / "openshokz" / "state.json"
 
 
 def _active_preset() -> str | None:
     """Return the last-applied preset arg from state.json, or None on first run."""
     try:
-        state = _load_headset_state()
-        return str(state.get("active_eq", "")) or None
-    except (FileNotFoundError, KeyError, ValueError):
+        return str(json.loads(_STATE_FILE.read_text()).get("active_eq", "")) or None
+    except (FileNotFoundError, KeyError, ValueError, json.JSONDecodeError):
         return None
 
 
@@ -99,12 +95,17 @@ class EqSection(Adw.PreferencesGroup):
     def _on_chip_toggled(self, btn: Gtk.ToggleButton, arg: str, _preset: dict[str, object]) -> None:
         if not btn.get_active():
             return
-        ok, _ = run_openshokz("eq", arg)
-        if ok:
-            self._active_arg = arg
-            self._rebuild_chips()
-        else:
-            btn.set_active(False)
+        btn.set_sensitive(False)  # prevent double-click during 3 s headset call
+
+        def _done(ok: bool, _out: str) -> None:
+            btn.set_sensitive(self._connected)
+            if ok:
+                self._active_arg = arg
+                self._rebuild_chips()
+            else:
+                btn.set_active(False)
+
+        run_openshokz_async(_done, "eq", arg)
 
     def _on_add_clicked(self, _: Gtk.Button) -> None:
         from ui.edit_preset_page import EditPresetPage
