@@ -17,4 +17,5 @@ data/
 /tmp/
 *.tmp
 gnome-extension/.eslintcache
+*.zip
 .gourmand-cache/
