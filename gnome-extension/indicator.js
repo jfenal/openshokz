@@ -1,12 +1,14 @@
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import {SystemIndicator} from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 import {fetchBattery} from './subprocess.js';
 import {OpenshokzMenu} from './presetMenu.js';
 
-export class OpenshokzIndicator extends SystemIndicator {
-    constructor() {
-        super();
+export const OpenshokzIndicator = GObject.registerClass(
+class OpenshokzIndicator extends SystemIndicator {
+    _init() {
+        super._init();
         this._indicatorLabel = this._addIndicator();
         this._indicatorLabel.text = '🎧 --';
         this._pollId = null;
@@ -47,4 +49,4 @@ export class OpenshokzIndicator extends SystemIndicator {
         }
         super.destroy();
     }
-}
+});

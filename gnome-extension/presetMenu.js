@@ -1,4 +1,5 @@
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
@@ -22,9 +23,10 @@ function _readActivePreset() {
     }
 }
 
-export class OpenshokzMenu extends QuickSettingsMenu {
-    constructor(indicator, batteryRef) {
-        super(indicator, 1);
+export const OpenshokzMenu = GObject.registerClass(
+class OpenshokzMenu extends QuickSettingsMenu {
+    _init(indicator, batteryRef) {
+        super._init(indicator, 1);
         this._batteryRef = batteryRef; // object with {text} updated by indicator
         this._activePreset = null;
         this._presetButtons = [];
@@ -176,4 +178,4 @@ export class OpenshokzMenu extends QuickSettingsMenu {
         }
         super.destroy();
     }
-}
+});
