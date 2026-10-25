@@ -1,6 +1,8 @@
-"""Device info section: firmware, battery, paired devices."""
+"""Device info section: model, firmware, battery."""
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import gi
 
@@ -11,6 +13,9 @@ gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 
 from gi.repository import Adw, Gtk  # noqa: E402
+
+if TYPE_CHECKING:
+    from openshokz.ui.window import OpenshokzWindow
 
 _BATTERY_ICONS = [
     "battery-empty-symbolic",
@@ -29,9 +34,10 @@ def _battery_icon(pct: int) -> str:
 
 
 class DeviceSection(Adw.PreferencesGroup):
-    def __init__(self) -> None:
+    def __init__(self, win: OpenshokzWindow) -> None:
         super().__init__()
         self.set_title("Device")
+        self._win = win
 
         self._model_row = Adw.ActionRow()
         self._model_row.set_title("Model")
@@ -50,16 +56,11 @@ class DeviceSection(Adw.PreferencesGroup):
         self._bat_row.add_prefix(self._bat_icon)
         self.add(self._bat_row)
 
-        self._dev_row = Adw.ActionRow()
-        self._dev_row.set_title("Paired devices")
-        self._dev_row.set_subtitle("—")
-        self._dev_row.set_subtitle_lines(6)
-        self.add(self._dev_row)
-
     def _clear(self) -> None:
-        for row in (self._model_row, self._fw_row, self._bat_row, self._dev_row):
+        for row in (self._model_row, self._fw_row, self._bat_row):
             row.set_subtitle("—")
         self._bat_icon.set_from_icon_name("battery-missing-symbolic")
+        self._win.update_paired_devices([])
 
     def refresh(
         self,
@@ -72,11 +73,15 @@ class DeviceSection(Adw.PreferencesGroup):
             self._clear()
             return
 
+        # Model name is known from the YAML without a socket connection — show immediately.
+        self._model_row.set_subtitle(str(model.get("name", "—")))
+
         def _on_info(info: dict[str, object] | None, _error: Exception | None) -> None:
             if not info:
-                self._clear()
+                for row in (self._fw_row, self._bat_row):
+                    row.set_subtitle("—")
+                self._bat_icon.set_from_icon_name("battery-missing-symbolic")
                 return
-            self._model_row.set_subtitle(str(info.get("name", "—")))
             self._fw_row.set_subtitle(str(info.get("firmware", "—")))
             pct = info.get("battery_pct")
             raw = info.get("battery_raw")
@@ -86,15 +91,7 @@ class DeviceSection(Adw.PreferencesGroup):
                 self._bat_icon.set_from_icon_name(_battery_icon(int(str(pct))))
             else:
                 self._bat_row.set_subtitle("—")
-            devices = info.get("paired_devices", [])
-            if devices:
-                lines = []
-                for dev in devices:  # type: ignore[union-attr]
-                    assert isinstance(dev, dict)
-                    status = "connected" if dev.get("active") else "paired"
-                    lines.append(f"[{status}] {dev.get('name', '?')} ({dev.get('mac', '?')})")
-                self._dev_row.set_subtitle("\n".join(lines))
-            else:
-                self._dev_row.set_subtitle("—")
+            devices = list(info.get("paired_devices", []))  # type: ignore[arg-type]
+            self._win.update_paired_devices(devices)
 
         run_async(_on_info, _core.get_headset_info, mac, model, channel)

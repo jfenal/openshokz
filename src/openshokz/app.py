@@ -38,12 +38,14 @@ class OpenshokzApp(Adw.Application):
             self._win.present()
             return
         self._win = OpenshokzWindow(self)
-        self._win.add_section(DeviceSection())
+        self._win.add_section(DeviceSection(self._win))
         self._win.add_section(EqSection(self._win))
         self._win.add_section(LanguageSection())
         self._win.present()
         self._win.refresh_connectivity()
-        self._win.connect("notify::is-active", lambda w, _: w.refresh_connectivity())
+        self._win.connect(
+            "notify::is-active", lambda w, _: w.refresh_connectivity() if w.is_active() else None
+        )
 
     def do_shutdown(self) -> None:
         conn = self.get_dbus_connection()

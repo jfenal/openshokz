@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from openshokz.ui.eq_section import EqSection
 
 _DEFAULT_WIDTH = 420
+_MIN_HEIGHT = 600
 
 
 class OpenshokzWindow(Adw.ApplicationWindow):
@@ -26,12 +27,8 @@ class OpenshokzWindow(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application) -> None:
         super().__init__(application=app)
         self.set_title("openshokz")
-        self.set_default_size(_DEFAULT_WIDTH, -1)
-
-        self._nav_view = Adw.NavigationView()
-
-        main_page = Adw.NavigationPage()
-        main_page.set_title("openshokz")
+        self.set_default_size(_DEFAULT_WIDTH, _MIN_HEIGHT)
+        self.set_size_request(_DEFAULT_WIDTH, _MIN_HEIGHT)
 
         toolbar_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
@@ -58,6 +55,30 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         add_act.connect("activate", self._on_add_preset)
         self.add_action(add_act)
 
+        # --- Sidebar (Paired Devices) ---
+        sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        sidebar_box.set_margin_top(12)
+        sidebar_box.set_margin_bottom(12)
+        sidebar_box.set_margin_start(12)
+        sidebar_box.set_margin_end(12)
+
+        sidebar_title = Gtk.Label(label="Paired Devices")
+        sidebar_title.add_css_class("heading")
+        sidebar_title.set_halign(Gtk.Align.START)
+        sidebar_title.set_margin_bottom(8)
+        sidebar_box.append(sidebar_title)
+
+        self._devices_listbox = Gtk.ListBox()
+        self._devices_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self._devices_listbox.add_css_class("boxed-list")
+        sidebar_box.append(self._devices_listbox)
+
+        sidebar_scroll = Gtk.ScrolledWindow()
+        sidebar_scroll.set_vexpand(True)
+        sidebar_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        sidebar_scroll.set_child(sidebar_box)
+
+        # --- Main content ---
         outer_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
         self._banner = Adw.Banner()
@@ -65,10 +86,10 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         self._banner.set_revealed(False)
         outer_box.append(self._banner)
 
-        scroll = Gtk.ScrolledWindow()
-        scroll.set_vexpand(True)
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroll.set_propagate_natural_height(True)
+        content_scroll = Gtk.ScrolledWindow()
+        content_scroll.set_vexpand(True)
+        content_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        content_scroll.set_propagate_natural_height(True)
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(600)
@@ -81,13 +102,21 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         self._content_box.set_margin_end(12)
 
         clamp.set_child(self._content_box)
-        scroll.set_child(clamp)
-        outer_box.append(scroll)
+        content_scroll.set_child(clamp)
+        outer_box.append(content_scroll)
 
-        toolbar_view.set_content(outer_box)
-        main_page.set_child(toolbar_view)
-        self._nav_view.add(main_page)
-        self.set_content(self._nav_view)
+        # --- Split view ---
+        self._split_view = Adw.OverlaySplitView()
+        self._split_view.set_sidebar_position(Gtk.PackType.END)
+        self._split_view.set_min_sidebar_width(180)
+        self._split_view.set_max_sidebar_width(220)
+        self._split_view.set_collapsed(True)
+        self._split_view.set_show_sidebar(False)
+        self._split_view.set_content(outer_box)
+        self._split_view.set_sidebar(sidebar_scroll)
+
+        toolbar_view.set_content(self._split_view)
+        self.set_content(toolbar_view)
 
         self._sections: list[object] = []
         self._connection: tuple[str, ModelData, int] | None = None
@@ -104,6 +133,24 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         self._sections.append(group)
         if isinstance(group, EqSection):
             self._eq_section = group
+
+    def update_paired_devices(self, devices: list[dict]) -> None:
+        """Populate the sidebar with paired device rows; show/hide it accordingly."""
+        while self._devices_listbox.get_first_child():
+            child = self._devices_listbox.get_first_child()
+            if child is not None:
+                self._devices_listbox.remove(child)
+
+        for dev in devices:
+            assert isinstance(dev, dict)
+            status = "connected" if dev.get("active") else "paired"
+            row = Adw.ActionRow()
+            row.set_title(str(dev.get("name", "?")))
+            row.set_subtitle(f"[{status}]  {dev.get('mac', '?')}")
+            self._devices_listbox.append(row)
+
+        self._split_view.set_show_sidebar(bool(devices))
+        self._split_view.set_collapsed(not bool(devices))
 
     def rebuild_preset_menu(self, custom_presets: list[dict]) -> None:
         """Rebuild the header bar menu from the current custom preset list."""
@@ -126,7 +173,6 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         add_section.append_item(add_item)
         menu.append_section(None, add_section)
 
-        # Disable Add when at capacity
         add_act = self.lookup_action("add-preset")
         if add_act:
             add_act.set_enabled(len(custom_presets) < 3)
