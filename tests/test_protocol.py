@@ -4,35 +4,31 @@ All tests run without hardware — they verify the packet builder,
 CRC, parser, and model loader against values from live captures.
 """
 
-import json
 import struct
-import sys
 import textwrap
 from pathlib import Path
 
 import pytest
 import yaml
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from protocol import build_packet, crc16_maxim, parse_packet
-from shokz_config import (
+from openshokz.core import (
     ModelData,
     ShokzError,
     _as_int,
     _as_str,
     _coerce_model,
     _config_dir,
-    _load_presets,
-    _load_state,
     _resolve_preset_name,
-    _save_presets,
-    _save_state,
     _validate_bands,
-    cmd_eq_list,
-    cmd_preset_add,
-    cmd_preset_delete,
+    add_custom_preset,
+    delete_custom_preset,
+    list_eq_presets,
+    load_custom_presets,
+    load_state,
+    save_custom_presets,
+    save_state,
 )
+from openshokz.protocol import build_packet, crc16_maxim, parse_packet
 
 
 def _firmware_query_inner() -> bytes:
@@ -139,7 +135,6 @@ class TestBuildPacket:
         assert build_packet(0x02, b"")[4:8] == b"\x01\x00\x00\x00"
 
     def test_proto_ver_read_is_2(self) -> None:
-        # Body at 0x14; tag=2 TLV: tag(4) + len(4) + value(4) -> value at 0x14+8=0x1C
         val = struct.unpack_from("<I", build_packet(0x02, b""), 0x1C)[0]
         assert val == 2
 
@@ -222,8 +217,6 @@ class TestCoercionHelpers:
         assert _as_int(14) == 14
 
     def test_as_int_str(self) -> None:
-        # YAML parses hex literals (0x0e) as ints automatically;
-        # _as_int handles plain decimal strings
         assert _as_int("14", 0) == 14
 
     def test_as_int_invalid(self) -> None:
@@ -355,10 +348,14 @@ class TestOpenComm2Model:
 
     @pytest.fixture()
     def model_path(self) -> Path:
-        p = Path(__file__).parent.parent / "models" / "opencomm2_2025.yaml"
-        if not p.exists():
-            pytest.skip("models/opencomm2_2025.yaml not found")
-        return p
+        # Try src layout first, fall back to root models/
+        for candidate in [
+            Path(__file__).parent.parent / "src" / "openshokz" / "models" / "opencomm2_2025.yaml",
+            Path(__file__).parent.parent / "models" / "opencomm2_2025.yaml",
+        ]:
+            if candidate.exists():
+                return candidate
+        pytest.skip("opencomm2_2025.yaml not found")
 
     @pytest.fixture()
     def model(self, model_path: Path) -> ModelData:
@@ -391,15 +388,8 @@ class TestOpenComm2Model:
         assert any("a0:0c:e2" in oui.lower() for oui in ouis)
 
 
-# Battery percentage formula
-
-
 class TestBatteryFormula:
-    """Battery percentage formula: min(100, (level+1) * (100//(scale+1))).
-
-    Verified against phone app (Shokz app showed 40% when level=3, scale=9).
-    Each level represents a 10-percentage-point step on the 0-9 scale.
-    """
+    """Battery percentage formula: min(100, (level+1) * (100//(scale+1)))."""
 
     def _pct(self, level: int, scale: int = 9) -> int:
         return min(100, (level + 1) * (100 // (scale + 1)))
@@ -427,46 +417,40 @@ class TestPresetStorage:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        assert _load_presets() == []
+        assert load_custom_presets() == []
 
     def test_save_and_load_presets(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
         presets: list[dict[str, object]] = [{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}]
-        _save_presets(presets)
-        assert _load_presets() == presets
+        save_custom_presets(presets)
+        assert load_custom_presets() == presets
 
     def test_save_state_and_load(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        _save_state("vocal")
-        assert _load_state()["active_eq"] == "vocal"
+        save_state("vocal")
+        assert load_state()["active_eq"] == "vocal"
 
     def test_save_state_atomic(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        _save_state("standard")
+        save_state("standard")
         assert not (_config_dir() / "state.json.tmp").exists()
 
 
 class TestEqList:
-    def test_list_builtin_only(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_list_builtin_only(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
         model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
-        cmd_eq_list(model)
-        out = json.loads(capsys.readouterr().out)
-        assert len(out) == 2
-        assert out[0] == {"name": "Standard", "builtin": True, "arg": "standard"}
-        assert out[1] == {"name": "Vocal Booster", "builtin": True, "arg": "vocal"}
+        result = list_eq_presets(model)
+        assert len(result) == 2
+        assert result[0] == {"name": "Standard", "builtin": True, "arg": "standard"}
+        assert result[1] == {"name": "Vocal Booster", "builtin": True, "arg": "vocal"}
 
-    def test_list_includes_custom(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_list_includes_custom(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        _save_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
+        save_custom_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
         model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
-        cmd_eq_list(model)
-        out = json.loads(capsys.readouterr().out)
-        assert out[2] == {"name": "My Bass", "builtin": False, "arg": "My Bass"}
+        result = list_eq_presets(model)
+        assert result[2] == {"name": "My Bass", "builtin": False, "arg": "My Bass"}
 
 
 class TestNamedPreset:
@@ -479,7 +463,7 @@ class TestNamedPreset:
 
     def test_named_custom_resolves(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        _save_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
+        save_custom_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
         model = _coerce_model(yaml.safe_load(_MINIMAL_YAML))
         preset_id, bands = _resolve_preset_name("My Bass", model)
         assert preset_id == 1
@@ -499,26 +483,26 @@ class TestNamedPreset:
 class TestPresetManagement:
     def test_add_preset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        cmd_preset_add("My Bass", [4, 0, 0, 0, 0, 0, 0])
-        assert _load_presets()[0]["name"] == "My Bass"
+        add_custom_preset("My Bass", [4, 0, 0, 0, 0, 0, 0])
+        assert load_custom_presets()[0]["name"] == "My Bass"
 
     def test_add_fourth_preset_raises(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        _save_presets([{"name": f"P{i}", "bands": [0] * 7} for i in range(3)])
+        save_custom_presets([{"name": f"P{i}", "bands": [0] * 7} for i in range(3)])
         with pytest.raises(ShokzError, match="maximum 3"):
-            cmd_preset_add("P4", [0] * 7)
+            add_custom_preset("P4", [0] * 7)
 
     def test_delete_preset(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
-        _save_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
-        cmd_preset_delete("My Bass")
-        assert _load_presets() == []
+        save_custom_presets([{"name": "My Bass", "bands": [4, 0, 0, 0, 0, 0, 0]}])
+        delete_custom_preset("My Bass")
+        assert load_custom_presets() == []
 
     def test_delete_nonexistent_raises(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
         with pytest.raises(ShokzError, match="not found"):
-            cmd_preset_delete("Ghost")
+            delete_custom_preset("Ghost")

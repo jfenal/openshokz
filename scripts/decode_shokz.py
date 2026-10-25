@@ -20,11 +20,8 @@ Packet structure (all LE):
 
 import struct
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from protocol import BODY_OFFSET, MAGIC, RESPONSE_BIT, TAG_CMD_ID, TAG_PAYLOAD
+from openshokz.protocol import BODY_OFFSET, MAGIC, RESPONSE_BIT, TAG_CMD_ID, TAG_PAYLOAD
 
 RESPONSE_BIT_MASK = RESPONSE_BIT - 1  # strips the response bit: 0x7FFF
 HEADSET_OUI = "a0:0c:e2"

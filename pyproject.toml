@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "PyYAML>=6.0",
+    "PyGObject>=3.0",
 ]
 
 [project.optional-dependencies]
@@ -18,9 +19,15 @@ dev = [
 ]
 
 [project.scripts]
-openshokz = "shokz_config:main"
-openshokz-app = "openshokz_app:main"
+openshokz = "openshokz.cli:main"
+openshokz-app = "openshokz.app:main"
 shokz-probe = "scripts.probe_model:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"openshokz" = ["models/*.yaml"]
 
 [tool.ruff]
 target-version = "py311"
@@ -56,21 +63,15 @@ ignore_missing_imports = true
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = ["ui.*", "openshokz_app"]
+module = ["openshokz.ui.*", "openshokz.app", "openshokz.cli"]
 ignore_errors = true
 
 [tool.basedpyright]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportMissingModuleSource = false
-ignore = ["ui", "openshokz_app.py"]
-
-[tool.setuptools]
-packages = ["ui", "scripts", "models"]
-py-modules = ["shokz_config", "openshokz_app", "protocol"]
-
-[tool.setuptools.package-data]
-models = ["*.yaml"]
+ignore = ["src/openshokz/ui", "src/openshokz/app.py", "src/openshokz/cli.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]

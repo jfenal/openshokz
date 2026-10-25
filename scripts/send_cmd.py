@@ -11,11 +11,8 @@ Usage:
 import socket
 import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from protocol import (
+from openshokz.protocol import (
     CMD_FIRMWARE,
     DEFAULT_CHANNEL,
     RESPONSE_BIT,

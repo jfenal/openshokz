@@ -1,8 +1,4 @@
-"""Shokz BT protocol constants and low-level packet functions.
-
-All three tools (shokz_config.py, scripts/probe_model.py, scripts/send_cmd.py)
-import from here so the protocol logic lives in exactly one place.
-"""
+"""Shokz BT protocol constants and low-level packet functions."""
 
 import socket
 import struct
@@ -29,10 +25,7 @@ CMD_FIRMWARE = 0x02
 
 
 def crc16_maxim(raw: bytes) -> int:
-    """CRC16/Maxim: poly=0x8005, init=0, refin, refout, xorout=0xFFFF.
-
-    field_0x0A in every Shokz RFCOMM packet = crc16_maxim(packet[0x0C:]).
-    """
+    """CRC16/Maxim: poly=0x8005, init=0, refin, refout, xorout=0xFFFF."""
     crc = 0
     for b in raw:
         crc ^= b

@@ -1,45 +1,93 @@
-"""Tests for ui/headset.py subprocess helpers (no GTK required)."""
+"""Tests for openshokz.ui.headset async wrapper (no GTK/hardware required)."""
 
-import subprocess
-import sys
-from pathlib import Path
-from unittest.mock import patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from ui.headset import check_connected, run_openshokz
+import threading
+import time
+from unittest.mock import MagicMock, patch
 
 
-def _make_result(
-    returncode: int, stdout: str = "", stderr: str = ""
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr=stderr)
+class TestRunAsync:
+    """run_async dispatches work to a background thread and calls back on GLib main loop."""
 
+    def test_success_calls_callback_with_result(self) -> None:
+        results: list[tuple[object, object]] = []
 
-class TestRunOpenshokz:
-    def test_success_returns_true_and_stdout(self) -> None:
-        with patch("subprocess.run", return_value=_make_result(0, '[{"name":"Standard"}]')):
-            ok, out = run_openshokz("eq", "list", "--json")
-        assert ok is True
-        assert "Standard" in out
+        mock_idle_add = MagicMock(side_effect=lambda cb, *args: cb(*args))
 
-    def test_failure_returns_false(self) -> None:
-        with patch("subprocess.run", return_value=_make_result(1, "", "error")):
-            ok, _out = run_openshokz("eq", "standard")
-        assert ok is False
+        with patch("openshokz.ui.headset.GLib") as mock_glib:
+            mock_glib.idle_add = mock_idle_add
+            from openshokz.ui.headset import run_async
 
-    def test_spawn_error_returns_false(self) -> None:
-        with patch("subprocess.run", side_effect=Exception("no binary")):
-            ok, out = run_openshokz("eq", "list", "--json")
-        assert ok is False
-        assert "no binary" in out
+            def _work() -> str:
+                return "ok"
 
+            def _callback(result: object, error: object) -> None:
+                results.append((result, error))
 
-class TestCheckConnected:
-    def test_connected_when_exit_zero(self) -> None:
-        with patch("ui.headset.run_openshokz", return_value=(True, "Firmware: HC")):
-            assert check_connected() is True
+            run_async(_callback, _work)
+            # Give the thread time to complete
+            time.sleep(0.1)
 
-    def test_not_connected_when_exit_nonzero(self) -> None:
-        with patch("ui.headset.run_openshokz", return_value=(False, "")):
-            assert check_connected() is False
+        assert len(results) == 1
+        assert results[0] == ("ok", None)
+
+    def test_exception_calls_callback_with_error(self) -> None:
+        results: list[object] = []
+        err = ValueError("boom")
+
+        mock_idle_add = MagicMock(side_effect=lambda cb, *args: cb(*args))
+
+        with patch("openshokz.ui.headset.GLib") as mock_glib:
+            mock_glib.idle_add = mock_idle_add
+            from openshokz.ui.headset import run_async
+
+            def _fail() -> None:
+                raise err
+
+            def _callback(result: object, error: object) -> None:
+                results.append((result, error))
+
+            run_async(_callback, _fail)
+            time.sleep(0.1)
+
+        assert len(results) == 1
+        result_tuple = results[0]
+        assert isinstance(result_tuple, tuple)
+        assert result_tuple[0] is None
+        assert result_tuple[1] is err
+
+    def test_runs_in_background_thread(self) -> None:
+        thread_ids: list[int] = []
+
+        mock_idle_add = MagicMock(side_effect=lambda cb, *args: cb(*args))
+
+        with patch("openshokz.ui.headset.GLib") as mock_glib:
+            mock_glib.idle_add = mock_idle_add
+            from openshokz.ui.headset import run_async
+
+            def _work() -> int:
+                thread_ids.append(threading.get_ident())
+                return 0
+
+            run_async(lambda *_: None, _work)
+            time.sleep(0.1)
+
+        assert len(thread_ids) == 1
+        assert thread_ids[0] != threading.main_thread().ident
+
+    def test_passes_args_to_function(self) -> None:
+        received: list[object] = []
+
+        mock_idle_add = MagicMock(side_effect=lambda cb, *args: cb(*args))
+
+        with patch("openshokz.ui.headset.GLib") as mock_glib:
+            mock_glib.idle_add = mock_idle_add
+            from openshokz.ui.headset import run_async
+
+            def _work(a: int, b: str) -> tuple[int, str]:
+                received.extend([a, b])
+                return a, b
+
+            run_async(lambda *_: None, _work, 42, "hello")
+            time.sleep(0.1)
+
+        assert received == [42, "hello"]

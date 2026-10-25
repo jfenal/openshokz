@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import gi
 
+import openshokz.core as _core
+from openshokz.ui.headset import ModelData, run_async
+
 gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 
 from gi.repository import Adw, Gtk  # noqa: E402
 
-from ui.headset import check_connected  # noqa: E402
-
 _DEFAULT_WIDTH = 420
-_DEFAULT_HEIGHT = 600
 
 
 class OpenshokzWindow(Adw.ApplicationWindow):
@@ -21,9 +21,8 @@ class OpenshokzWindow(Adw.ApplicationWindow):
     def __init__(self, app: Adw.Application) -> None:
         super().__init__(application=app)
         self.set_title("openshokz")
-        self.set_default_size(_DEFAULT_WIDTH, _DEFAULT_HEIGHT)
+        self.set_default_size(_DEFAULT_WIDTH, -1)
 
-        # NavigationView lets EqSection push EditPresetPage
         self._nav_view = Adw.NavigationView()
 
         main_page = Adw.NavigationPage()
@@ -43,6 +42,7 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_propagate_natural_height(True)
 
         clamp = Adw.Clamp()
         clamp.set_maximum_size(600)
@@ -64,15 +64,20 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         self.set_content(self._nav_view)
 
         self._sections: list[object] = []
-        self._connected = False
+        self._connection: tuple[str, ModelData, int] | None = None
 
     def add_section(self, group: Adw.PreferencesGroup) -> None:
         self._content_box.append(group)
         self._sections.append(group)
 
     def refresh_connectivity(self) -> None:
-        self._connected = check_connected()
-        self._banner.set_revealed(not self._connected)
-        for section in self._sections:
-            if hasattr(section, "refresh"):
-                section.refresh(self._connected)  # type: ignore[union-attr]
+        def _on_result(result: tuple[str, ModelData, int] | None, error: Exception | None) -> None:
+            connected = result is not None and error is None
+            self._connection = result if connected else None
+            self._banner.set_revealed(not connected)
+            mac, model, channel = result if connected else (None, None, None)
+            for section in self._sections:
+                if hasattr(section, "refresh"):
+                    section.refresh(connected, mac, model, channel)  # type: ignore[union-attr]
+
+        run_async(_on_result, _core.resolve_headset)

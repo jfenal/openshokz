@@ -1,9 +1,8 @@
 import GLib from 'gi://GLib';
-import GObject from 'gi://GObject';
 import Gio from 'gi://Gio';
-import St from 'gi://St';
-import Clutter from 'gi://Clutter';
-import {QuickSettingsMenu} from 'resource:///org/gnome/shell/ui/quickSettings.js';
+import GObject from 'gi://GObject';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import {QuickMenuToggle} from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 import {runAsync} from './subprocess.js';
 
@@ -16,77 +15,57 @@ function _readActivePreset() {
         const state = JSON.parse(new TextDecoder().decode(contents));
         return state.active_eq ?? null;
     } catch (e) {
-        // State file may not exist on first run — that's expected
         if (!e.message?.includes('No such file'))
             log(`openshokz: could not read state file: ${e.message}`);
         return null;
     }
 }
 
-export const OpenshokzMenu = GObject.registerClass(
-class OpenshokzMenu extends QuickSettingsMenu {
-    _init(indicator, batteryRef) {
-        super._init(indicator, 1);
-        this._batteryRef = batteryRef; // object with {text} updated by indicator
-        this._activePreset = null;
-        this._presetButtons = [];
+export const OpenshokzToggle = GObject.registerClass(
+class OpenshokzToggle extends QuickMenuToggle {
+    _init() {
+        super._init({
+            title: 'OpenShokz',
+        });
+        this.iconName = 'audio-headset-symbolic';
+
+        this._activePreset = _readActivePreset();
+        this._presetItems = [];
         this._monitor = null;
-        this._connected = false;
+        this._loading = false;
+        this._retryId = null;
 
-        this._loading = false; // debounce: prevents concurrent _loadPresets calls
-        this._buildHeader();
-        this._buildPresetList();
-        this._buildFooter();
-        this._watchStateFile();
-    }
+        this._notConnectedItem = new PopupMenu.PopupMenuItem('Not connected', {reactive: false});
+        this.menu.addMenuItem(this._notConnectedItem);
 
-    _buildHeader() {
-        const box = new St.BoxLayout({
-            vertical: false,
-            style_class: 'quick-settings-item-header',
-        });
+        this._presetsSection = new PopupMenu.PopupMenuSection();
+        this.menu.addMenuItem(this._presetsSection);
 
-        this._headerLabel = new St.Label({text: 'OpenComm2', style_class: 'subtitle'});
-        this._batteryLabel = new St.Label({
-            text: this._batteryRef?.text ?? '--',
-            x_expand: true,
-            x_align: Clutter.ActorAlign.END,
-        });
-
-        box.add_child(this._headerLabel);
-        box.add_child(this._batteryLabel);
-        this.actor.add_child(box);
-    }
-
-    _buildPresetList() {
-        this._presetsBox = new St.BoxLayout({vertical: true, style_class: 'popup-sub-menu'});
-        this._notConnectedLabel = new St.Label({
-            text: 'Not connected',
-            style_class: 'subtitle',
-            visible: false,
-        });
-        this._presetsBox.add_child(this._notConnectedLabel);
-        this.actor.add_child(this._presetsBox);
-    }
-
-    _buildFooter() {
-        const settingsBtn = new St.Button({
-            label: 'Open Settings →',
-            style_class: 'button',
-            x_expand: true,
-        });
-        settingsBtn.connect('clicked', () => {
+        this.menu.addAction('Open Settings →', () => {
             const appPath = GLib.find_program_in_path('openshokz-app');
             if (appPath)
-                GLib.spawn_command_line_async(`${appPath}`);
+                GLib.spawn_command_line_async(appPath);
             else
                 GLib.spawn_command_line_async('bash -c "openshokz --help"');
-            this.close();
+            this.menu.close();
         });
-        this.actor.add_child(settingsBtn);
+
+        this.menu.connect('open-state-changed', (_menu, open) => {
+            if (open)
+                this._loadPresets();
+        });
+
+        this._watchStateFile();
+        this._loadPresets();
     }
 
     _watchStateFile() {
+        try {
+            Gio.File.new_for_path(GLib.path_get_dirname(STATE_PATH))
+                .make_directory_with_parents(null);
+        } catch (_e) {
+            // already exists
+        }
         try {
             const file = Gio.File.new_for_path(STATE_PATH);
             this._monitor = file.monitor_file(Gio.FileMonitorFlags.NONE, null);
@@ -94,70 +73,78 @@ class OpenshokzMenu extends QuickSettingsMenu {
                 this._activePreset = _readActivePreset();
                 this._refreshActiveHighlight();
             });
-        } catch (_e) {
-            // State file not yet created — no monitor needed
+        } catch (e) {
+            log(`openshokz: could not watch state file: ${e.message}`);
         }
     }
 
     _refreshActiveHighlight() {
-        for (const {btn, arg} of this._presetButtons) {
+        for (const {item, arg, label} of this._presetItems) {
+            item.setOrnament(arg === this._activePreset
+                ? PopupMenu.Ornament.DOT
+                : PopupMenu.Ornament.NO_DOT);
             if (arg === this._activePreset)
-                btn.add_style_class_name('selected');
-            else
-                btn.remove_style_class_name('selected');
+                this.subtitle = label;
         }
-    }
-
-    open(...args) {
-        super.open(...args);
-        this._activePreset = _readActivePreset();
-        this._batteryLabel.text = this._batteryRef?.text ?? '--';
-        this._loadPresets();
     }
 
     _loadPresets() {
         if (this._loading)
-            return; // already in flight — ignore rapid open/close
+            return;
         this._loading = true;
-        runAsync(['openshokz', 'eq', 'list', '--json']).then(({ok, stdout}) => {
+        runAsync(['openshokz', 'eq', 'list']).then(({ok, stdout}) => {
             this._loading = false;
             if (!ok) {
                 this._showNotConnected(true);
+                this._scheduleRetry();
                 return;
             }
+            this._cancelRetry();
             const presets = JSON.parse(stdout);
-            this._rebuildPresetButtons(presets);
+            this._rebuildPresetItems(presets);
             this._showNotConnected(false);
         }).catch(e => {
             this._loading = false;
             logError(e, 'openshokz preset list');
             this._showNotConnected(true);
+            this._scheduleRetry();
         });
     }
 
-    _showNotConnected(show) {
-        this._notConnectedLabel.visible = show;
-        for (const {btn} of this._presetButtons)
-            btn.reactive = !show;
+    _scheduleRetry() {
+        if (this._retryId !== null)
+            return;
+        this._retryId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, () => {
+            this._retryId = null;
+            this._loadPresets();
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
-    _rebuildPresetButtons(presets) {
-        // Remove old buttons (keep notConnectedLabel)
-        for (const {btn} of this._presetButtons)
-            this._presetsBox.remove_child(btn);
-        this._presetButtons = [];
+    _cancelRetry() {
+        if (this._retryId !== null) {
+            GLib.source_remove(this._retryId);
+            this._retryId = null;
+        }
+    }
+
+    _showNotConnected(show) {
+        this._notConnectedItem.visible = show;
+        for (const {item} of this._presetItems)
+            item.reactive = !show;
+    }
+
+    _rebuildPresetItems(presets) {
+        this._presetsSection.removeAll();
+        this._presetItems = [];
 
         for (const preset of presets) {
-            const btn = new St.Button({
-                label: preset.name,
-                style_class: 'button',
-                x_expand: true,
-                reactive: true,
-            });
-            if (preset.arg === this._activePreset)
-                btn.add_style_class_name('selected');
+            const item = new PopupMenu.PopupMenuItem(preset.name);
+            item.setOrnament(preset.arg === this._activePreset
+                ? PopupMenu.Ornament.DOT
+                : PopupMenu.Ornament.NO_DOT);
 
-            btn.connect('clicked', () => {
+            item.connect('activate', () => {
                 runAsync(['openshokz', 'eq', preset.arg]).then(({ok}) => {
                     if (ok) {
                         this._activePreset = preset.arg;
@@ -166,12 +153,16 @@ class OpenshokzMenu extends QuickSettingsMenu {
                 }).catch(e => logError(e, 'openshokz eq apply'));
             });
 
-            this._presetsBox.add_child(btn);
-            this._presetButtons.push({btn, arg: preset.arg});
+            this._presetsSection.addMenuItem(item);
+            this._presetItems.push({item, arg: preset.arg, label: preset.name});
         }
+
+        if (this._presetItems.length > 0)
+            this._refreshActiveHighlight();
     }
 
     destroy() {
+        this._cancelRetry();
         if (this._monitor) {
             this._monitor.cancel();
             this._monitor = null;

@@ -20,8 +20,7 @@ export default class OpenshokzExtension extends Extension {
 
         try {
             this._indicator = new OpenshokzIndicator();
-            Main.panel.statusArea['openshokz'] = this._indicator;
-            Main.panel._rightBox.insert_child_at_index(this._indicator, 0);
+            Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
         } catch (e) {
             logError(e, 'openshokz: failed to enable indicator');
             this._indicator = null;

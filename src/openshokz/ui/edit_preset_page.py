@@ -3,19 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 import gi
+
+import openshokz.core as _core
+from openshokz.ui.headset import ModelData, run_async
 
 gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 
 from gi.repository import Adw, Gtk  # noqa: E402
-
-from ui.headset import run_openshokz  # noqa: E402
-
-if TYPE_CHECKING:
-    pass
 
 BAND_LABELS = ["250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "6 kHz", "8 kHz"]
 
@@ -26,6 +23,7 @@ class EditPresetPage(Adw.NavigationPage):
     def __init__(
         self,
         on_done: Callable[[], None],
+        connection: tuple[str, ModelData, int] | None = None,
         name: str = "",
         bands: list[int] | None = None,
         is_new: bool = True,
@@ -35,6 +33,7 @@ class EditPresetPage(Adw.NavigationPage):
         self._on_done = on_done
         self._is_new = is_new
         self._original_name = name
+        self._connection = connection
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_top(12)
@@ -98,12 +97,24 @@ class EditPresetPage(Adw.NavigationPage):
         if not name:
             return
         bands = self._current_bands()
-        ok, _ = run_openshokz("eq", "preset", "add", name, *[str(b) for b in bands])
-        if ok:
-            run_openshokz("eq", name)
+        try:
+            _core.add_custom_preset(name, bands)
+        except _core.ShokzError:
+            return
+
+        if self._connection:
+            mac, model, channel = self._connection
+
+            def _done(_result: object, _error: object) -> None:
+                self._on_done()
+
+            run_async(_done, _core.apply_eq_preset, mac, model, channel, name)
+        else:
             self._on_done()
 
     def _on_delete(self, _: Adw.ButtonRow) -> None:
-        ok, _ = run_openshokz("eq", "preset", "delete", self._original_name)
-        if ok:
-            self._on_done()
+        try:
+            _core.delete_custom_preset(self._original_name)
+        except _core.ShokzError:
+            return
+        self._on_done()
