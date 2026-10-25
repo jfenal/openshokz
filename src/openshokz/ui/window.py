@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from openshokz.ui.eq_section import EqSection
 
 _DEFAULT_WIDTH = 640
-_MIN_HEIGHT = 740
+_MIN_HEIGHT = 600
 
 
 class OpenshokzWindow(Adw.ApplicationWindow):
