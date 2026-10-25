@@ -20,7 +20,7 @@ dev = [
 [project.scripts]
 openshokz = "openshokz.cli:main"
 openshokz-app = "openshokz.app:main"
-shokz-probe = "scripts.probe_model:main"
+shokz-probe = "openshokz.scripts.probe_model:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

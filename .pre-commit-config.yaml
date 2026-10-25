@@ -16,7 +16,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
-        args: [src/openshokz/core.py, src/openshokz/protocol.py, scripts/, tests/]
+        args: [src/openshokz/core.py, src/openshokz/protocol.py, src/openshokz/scripts/, tests/]
 
       - id: basedpyright
         name: basedpyright
@@ -24,7 +24,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
-        args: [--pythonpath, /usr/bin/python3, src/openshokz/core.py, src/openshokz/protocol.py, scripts/, tests/]
+        args: [--pythonpath, /usr/bin/python3, src/openshokz/core.py, src/openshokz/protocol.py, src/openshokz/scripts/, tests/]
 
       - id: pytest
         name: pytest
