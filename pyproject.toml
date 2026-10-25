@@ -27,7 +27,7 @@ shokz-probe = "scripts.probe_model:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"openshokz" = ["models/*.yaml"]
+"openshokz" = ["models/*.yaml", "data/*.desktop"]
 
 [tool.ruff]
 target-version = "py311"

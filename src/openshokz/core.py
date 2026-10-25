@@ -338,6 +338,19 @@ def add_custom_preset(name: str, bands: list[int]) -> None:
     save_custom_presets(presets)
 
 
+def update_custom_preset(original_name: str, new_name: str, bands: list[int]) -> None:
+    """Replace a custom preset in-place (preserves list order)."""
+    presets = load_custom_presets()
+    for p in presets:
+        if p.get("name") == original_name:
+            _validate_bands(bands)
+            p["name"] = new_name
+            p["bands"] = bands
+            save_custom_presets(presets)
+            return
+    raise ShokzError(f"Preset '{original_name}' not found.")
+
+
 def delete_custom_preset(name: str) -> None:
     """Remove a custom EQ preset by name. No headset connection needed."""
     presets = load_custom_presets()

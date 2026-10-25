@@ -1,4 +1,4 @@
-"""Edit-preset navigation page for custom EQ presets."""
+"""Modal dialog for creating or editing a custom EQ preset."""
 
 from __future__ import annotations
 
@@ -17,8 +17,8 @@ from gi.repository import Adw, Gtk  # noqa: E402
 BAND_LABELS = ["250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "6 kHz", "8 kHz"]
 
 
-class EditPresetPage(Adw.NavigationPage):
-    """Page for creating or editing a custom EQ preset."""
+class EditPresetDialog(Adw.Dialog):
+    """Modal dialog for creating or editing a custom EQ preset."""
 
     def __init__(
         self,
@@ -30,6 +30,8 @@ class EditPresetPage(Adw.NavigationPage):
     ) -> None:
         super().__init__()
         self.set_title("Edit Preset" if not is_new else "New Preset")
+        self.set_content_width(460)
+        self.set_content_height(680)
         self._on_done = on_done
         self._is_new = is_new
         self._original_name = name
@@ -66,42 +68,51 @@ class EditPresetPage(Adw.NavigationPage):
             bands_group.add(row)
         box.append(bands_group)
 
-        actions_group = Adw.PreferencesGroup()
-        apply_row = Adw.ButtonRow()
-        apply_row.set_title("Apply & Save")
-        apply_row.add_css_class("suggested-action")
-        apply_row.connect("activated", self._on_apply)
-        actions_group.add(apply_row)
+        apply_btn = Gtk.Button(label="Apply & Save")
+        apply_btn.add_css_class("suggested-action")
+        apply_btn.add_css_class("pill")
+        apply_btn.set_hexpand(True)
+        apply_btn.connect("clicked", self._on_apply)
+        box.append(apply_btn)
 
         if not is_new:
-            delete_row = Adw.ButtonRow()
-            delete_row.set_title("Delete")
-            delete_row.add_css_class("destructive-action")
-            delete_row.connect("activated", self._on_delete)
-            actions_group.add(delete_row)
-
-        box.append(actions_group)
+            delete_btn = Gtk.Button(label="Delete")
+            delete_btn.add_css_class("destructive-action")
+            delete_btn.add_css_class("pill")
+            delete_btn.set_hexpand(True)
+            delete_btn.set_margin_top(6)
+            delete_btn.connect("clicked", self._on_delete)
+            box.append(delete_btn)
 
         clamp = Adw.Clamp()
         clamp.set_child(box)
         scroll = Gtk.ScrolledWindow()
         scroll.set_vexpand(True)
+        scroll.set_propagate_natural_height(True)
         scroll.set_child(clamp)
-        self.set_child(scroll)
+
+        toolbar_view = Adw.ToolbarView()
+        toolbar_view.add_top_bar(Adw.HeaderBar())
+        toolbar_view.set_content(scroll)
+        self.set_child(toolbar_view)
 
     def _current_bands(self) -> list[int]:
         return [int(s.get_value()) for s in self._scales]
 
-    def _on_apply(self, _: Adw.ButtonRow) -> None:
+    def _on_apply(self, _: Gtk.Button) -> None:
         name = self._name_entry.get_text().strip()
         if not name:
             return
         bands = self._current_bands()
         try:
-            _core.add_custom_preset(name, bands)
+            if self._is_new:
+                _core.add_custom_preset(name, bands)
+            else:
+                _core.update_custom_preset(self._original_name, name, bands)
         except _core.ShokzError:
             return
 
+        self.close()
         if self._connection:
             mac, model, channel = self._connection
 
@@ -112,9 +123,10 @@ class EditPresetPage(Adw.NavigationPage):
         else:
             self._on_done()
 
-    def _on_delete(self, _: Adw.ButtonRow) -> None:
+    def _on_delete(self, _: Gtk.Button) -> None:
         try:
             _core.delete_custom_preset(self._original_name)
         except _core.ShokzError:
             return
+        self.close()
         self._on_done()

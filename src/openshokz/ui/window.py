@@ -17,8 +17,8 @@ from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 if TYPE_CHECKING:
     from openshokz.ui.eq_section import EqSection
 
-_DEFAULT_WIDTH = 420
-_MIN_HEIGHT = 600
+_DEFAULT_WIDTH = 640
+_MIN_HEIGHT = 740
 
 
 class OpenshokzWindow(Adw.ApplicationWindow):
@@ -28,7 +28,7 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         super().__init__(application=app)
         self.set_title("openshokz")
         self.set_default_size(_DEFAULT_WIDTH, _MIN_HEIGHT)
-        self.set_size_request(_DEFAULT_WIDTH, _MIN_HEIGHT)
+        self.set_size_request(420, _MIN_HEIGHT)
 
         toolbar_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
@@ -68,9 +68,15 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         sidebar_title.set_margin_bottom(8)
         sidebar_box.append(sidebar_title)
 
+        self._devices_placeholder = Gtk.Label(label="—")
+        self._devices_placeholder.add_css_class("dim-label")
+        self._devices_placeholder.set_halign(Gtk.Align.START)
+        sidebar_box.append(self._devices_placeholder)
+
         self._devices_listbox = Gtk.ListBox()
         self._devices_listbox.set_selection_mode(Gtk.SelectionMode.NONE)
         self._devices_listbox.add_css_class("boxed-list")
+        self._devices_listbox.set_visible(False)
         sidebar_box.append(self._devices_listbox)
 
         sidebar_scroll = Gtk.ScrolledWindow()
@@ -108,10 +114,10 @@ class OpenshokzWindow(Adw.ApplicationWindow):
         # --- Split view ---
         self._split_view = Adw.OverlaySplitView()
         self._split_view.set_sidebar_position(Gtk.PackType.END)
-        self._split_view.set_min_sidebar_width(180)
-        self._split_view.set_max_sidebar_width(220)
-        self._split_view.set_collapsed(True)
-        self._split_view.set_show_sidebar(False)
+        self._split_view.set_min_sidebar_width(200)
+        self._split_view.set_max_sidebar_width(240)
+        self._split_view.set_collapsed(False)
+        self._split_view.set_show_sidebar(True)
         self._split_view.set_content(outer_box)
         self._split_view.set_sidebar(sidebar_scroll)
 
@@ -149,8 +155,8 @@ class OpenshokzWindow(Adw.ApplicationWindow):
             row.set_subtitle(f"[{status}]  {dev.get('mac', '?')}")
             self._devices_listbox.append(row)
 
-        self._split_view.set_show_sidebar(bool(devices))
-        self._split_view.set_collapsed(not bool(devices))
+        self._devices_placeholder.set_visible(not bool(devices))
+        self._devices_listbox.set_visible(bool(devices))
 
     def rebuild_preset_menu(self, custom_presets: list[dict]) -> None:
         """Rebuild the header bar menu from the current custom preset list."""

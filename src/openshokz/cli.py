@@ -186,11 +186,15 @@ def main() -> None:
         proxy = get_proxy()
 
         if proxy is not None:
+            # App is running — always delegate, never fall through to direct RFCOMM
+            # (would cause EBUSY since the app holds the socket).
             if command == "info":
                 info = proxy_get_info(proxy)
                 if info:
                     _print_info(info, short=short_flag)
-                    return
+                else:
+                    sys.exit("Headset not connected")
+                return
             elif command == "eq" and args and args[0].lower() != "custom":
                 ok = proxy_apply_eq(proxy, args[0])
                 if not ok:
@@ -201,7 +205,8 @@ def main() -> None:
                 if not ok:
                     sys.exit("Unexpected response from headset")
                 return
-            # For custom EQ and interactive mode, fall through to direct connection.
+            # Custom EQ bands and interactive mode: fall through to direct connection
+            # (app doesn't expose these via D-Bus).
 
         mac, model, channel = resolve_headset(mac_arg, model_arg)
 

@@ -112,49 +112,35 @@ class EqSection(Adw.PreferencesGroup):
     # --- called by window action handlers ---
 
     def open_edit(self, arg: str) -> None:
-        from openshokz.ui.edit_preset_page import EditPresetPage
+        from openshokz.ui.edit_preset_page import EditPresetDialog
 
         custom = {str(p["name"]): p for p in _core.load_custom_presets()}
         preset = custom.get(arg)
         if preset is None:
             return
-        nav = getattr(self._win, "_nav_view", None)
-        if nav is None:
-            return
         bands = [int(b) for b in preset.get("bands", [])]  # type: ignore[arg-type]
-        page = EditPresetPage(
-            on_done=self._on_edit_done,
+        EditPresetDialog(
+            on_done=self._load_preset_chips,
             connection=self._connection,
             name=arg,
             bands=bands,
             is_new=False,
-        )
-        nav.push(page)
+        ).present(self._win)
 
     def open_add(self) -> None:
-        from openshokz.ui.edit_preset_page import EditPresetPage
+        from openshokz.ui.edit_preset_page import EditPresetDialog
 
-        nav = getattr(self._win, "_nav_view", None)
-        if nav is None:
-            return
-        page = EditPresetPage(
-            on_done=self._on_edit_done,
+        EditPresetDialog(
+            on_done=self._load_preset_chips,
             connection=self._connection,
             is_new=True,
-        )
-        nav.push(page)
+        ).present(self._win)
 
     def delete_preset(self, arg: str) -> None:
         try:
             _core.delete_custom_preset(arg)
         except _core.ShokzError:
             return
-        self._load_preset_chips()
-
-    def _on_edit_done(self) -> None:
-        nav = getattr(self._win, "_nav_view", None)
-        if nav:
-            nav.pop()
         self._load_preset_chips()
 
     def refresh(
