@@ -43,7 +43,6 @@ class EqSection(Adw.PreferencesGroup):
         self._flow_row.set_child(self._flow)
         self.add(self._flow_row)
 
-        # Load presets immediately — no headset needed
         self._load_preset_chips()
 
     def _load_preset_chips(self) -> None:
@@ -58,6 +57,7 @@ class EqSection(Adw.PreferencesGroup):
             active = _active_preset()
             seen: set[str] = set()
             connected = self._connection is not None
+            custom_presets: list[dict] = []
 
             for preset in result:
                 arg = str(preset.get("arg", ""))
@@ -65,6 +65,9 @@ class EqSection(Adw.PreferencesGroup):
                 if arg in seen:
                     continue
                 seen.add(arg)
+
+                if not preset.get("builtin", True):
+                    custom_presets.append({"name": arg})
 
                 btn = Gtk.ToggleButton(label=name)
                 btn.add_css_class("pill")
@@ -75,13 +78,8 @@ class EqSection(Adw.PreferencesGroup):
                 btn.set_sensitive(connected)
                 self._flow.append(btn)
 
-            custom_count = sum(1 for p in result if not p.get("builtin"))
-            if custom_count < 3:
-                add_btn = Gtk.Button(label="+ Add")
-                add_btn.add_css_class("pill")
-                add_btn.set_sensitive(connected)
-                add_btn.connect("clicked", self._on_add_clicked)
-                self._flow.append(add_btn)
+            # Rebuild the window's hamburger menu with the current custom presets
+            self._win.rebuild_preset_menu(custom_presets)
 
         run_async(_on_presets, _core.list_eq_presets)
 
@@ -111,7 +109,29 @@ class EqSection(Adw.PreferencesGroup):
 
         run_async(_done, _core.apply_eq_preset, mac, model, channel, arg)
 
-    def _on_add_clicked(self, _: Gtk.Button) -> None:
+    # --- called by window action handlers ---
+
+    def open_edit(self, arg: str) -> None:
+        from openshokz.ui.edit_preset_page import EditPresetPage
+
+        custom = {str(p["name"]): p for p in _core.load_custom_presets()}
+        preset = custom.get(arg)
+        if preset is None:
+            return
+        nav = getattr(self._win, "_nav_view", None)
+        if nav is None:
+            return
+        bands = [int(b) for b in preset.get("bands", [])]  # type: ignore[arg-type]
+        page = EditPresetPage(
+            on_done=self._on_edit_done,
+            connection=self._connection,
+            name=arg,
+            bands=bands,
+            is_new=False,
+        )
+        nav.push(page)
+
+    def open_add(self) -> None:
         from openshokz.ui.edit_preset_page import EditPresetPage
 
         nav = getattr(self._win, "_nav_view", None)
@@ -123,6 +143,13 @@ class EqSection(Adw.PreferencesGroup):
             is_new=True,
         )
         nav.push(page)
+
+    def delete_preset(self, arg: str) -> None:
+        try:
+            _core.delete_custom_preset(arg)
+        except _core.ShokzError:
+            return
+        self._load_preset_chips()
 
     def _on_edit_done(self) -> None:
         nav = getattr(self._win, "_nav_view", None)

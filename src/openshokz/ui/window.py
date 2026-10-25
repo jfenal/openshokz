@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import gi
 
 import openshokz.core as _core
@@ -10,7 +12,10 @@ from openshokz.ui.headset import ModelData, run_async
 gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 
-from gi.repository import Adw, Gtk  # noqa: E402
+from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
+
+if TYPE_CHECKING:
+    from openshokz.ui.eq_section import EqSection
 
 _DEFAULT_WIDTH = 420
 
@@ -30,7 +35,28 @@ class OpenshokzWindow(Adw.ApplicationWindow):
 
         toolbar_view = Adw.ToolbarView()
         header = Adw.HeaderBar()
+
+        # Hamburger menu button — model is replaced on each preset change
+        self._menu_btn = Gtk.MenuButton()
+        self._menu_btn.set_icon_name("open-menu-symbolic")
+        header.pack_end(self._menu_btn)
+
         toolbar_view.add_top_bar(header)
+
+        # String-parameter actions for Edit/Delete individual presets
+        str_type = GLib.VariantType.new("s")
+        for action_name, handler in (
+            ("edit-preset", self._on_edit_preset),
+            ("delete-preset", self._on_delete_preset),
+        ):
+            act = Gio.SimpleAction.new(action_name, str_type)
+            act.connect("activate", handler)
+            self.add_action(act)
+
+        # No-parameter action for Add
+        add_act = Gio.SimpleAction.new("add-preset", None)
+        add_act.connect("activate", self._on_add_preset)
+        self.add_action(add_act)
 
         outer_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
 
@@ -65,13 +91,67 @@ class OpenshokzWindow(Adw.ApplicationWindow):
 
         self._sections: list[object] = []
         self._connection: tuple[str, ModelData, int] | None = None
+        self._refreshing = False
+        self._eq_section: EqSection | None = None
+
+        # Build the initial (empty) menu
+        self.rebuild_preset_menu([])
 
     def add_section(self, group: Adw.PreferencesGroup) -> None:
+        from openshokz.ui.eq_section import EqSection
+
         self._content_box.append(group)
         self._sections.append(group)
+        if isinstance(group, EqSection):
+            self._eq_section = group
+
+    def rebuild_preset_menu(self, custom_presets: list[dict]) -> None:
+        """Rebuild the header bar menu from the current custom preset list."""
+        menu = Gio.Menu()
+
+        if custom_presets:
+            presets_section = Gio.Menu()
+            for p in custom_presets:
+                arg = str(p.get("name", ""))
+                label = arg
+                preset_submenu = Gio.Menu()
+                preset_submenu.append(f"Edit “{label}”", f"win.edit-preset::{arg}")
+                preset_submenu.append(f"Delete “{label}”", f"win.delete-preset::{arg}")
+                item = Gio.MenuItem.new_submenu(label, preset_submenu)
+                presets_section.append_item(item)
+            menu.append_section("Custom Presets", presets_section)
+
+        add_item = Gio.MenuItem.new("Add Preset", "win.add-preset")
+        add_section = Gio.Menu()
+        add_section.append_item(add_item)
+        menu.append_section(None, add_section)
+
+        # Disable Add when at capacity
+        add_act = self.lookup_action("add-preset")
+        if add_act:
+            add_act.set_enabled(len(custom_presets) < 3)
+
+        self._menu_btn.set_menu_model(menu)
+
+    def _on_edit_preset(self, _action: Gio.SimpleAction, param: GLib.Variant) -> None:
+        if self._eq_section is not None:
+            self._eq_section.open_edit(param.get_string())
+
+    def _on_delete_preset(self, _action: Gio.SimpleAction, param: GLib.Variant) -> None:
+        if self._eq_section is not None:
+            self._eq_section.delete_preset(param.get_string())
+
+    def _on_add_preset(self, _action: Gio.SimpleAction, _param: object) -> None:
+        if self._eq_section is not None:
+            self._eq_section.open_add()
 
     def refresh_connectivity(self) -> None:
+        if self._refreshing:
+            return
+        self._refreshing = True
+
         def _on_result(result: tuple[str, ModelData, int] | None, error: Exception | None) -> None:
+            self._refreshing = False
             connected = result is not None and error is None
             self._connection = result if connected else None
             self._banner.set_revealed(not connected)
