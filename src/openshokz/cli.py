@@ -1,4 +1,8 @@
-"""openshokz CLI — thin wrapper around openshokz.core that prints results."""
+"""openshokz CLI — thin wrapper around openshokz.core that prints results.
+
+When the openshokz-app is running, headset commands (info, eq, lang) are
+delegated to it via D-Bus so both processes share the single RFCOMM connection.
+"""
 
 from __future__ import annotations
 
@@ -16,11 +20,10 @@ from openshokz.core import (
     list_eq_presets,
     resolve_headset,
 )
+from openshokz.dbus_client import get_proxy, proxy_apply_eq, proxy_apply_language, proxy_get_info
 
 
-def _cmd_info(mac: str, model: object, channel: int, short: bool = False) -> None:
-    assert isinstance(model, dict)
-    info = get_headset_info(mac, model, channel)  # type: ignore[arg-type]
+def _print_info(info: dict[str, object], short: bool = False) -> None:
     print(f"Model    : {info.get('name', '?')}")
     print(f"Firmware : {info.get('firmware', '?')}")
     pct = info.get("battery_pct")
@@ -37,6 +40,12 @@ def _cmd_info(mac: str, model: object, channel: int, short: bool = False) -> Non
             assert isinstance(dev, dict)
             status = "connected" if dev.get("active") else "paired"
             print(f"  [{status}] {dev.get('name', '?')} ({dev.get('mac', '?')})")
+
+
+def _cmd_info(mac: str, model: object, channel: int, short: bool = False) -> None:
+    assert isinstance(model, dict)
+    info = get_headset_info(mac, model, channel)  # type: ignore[arg-type]
+    _print_info(info, short=short)
 
 
 def _interactive(mac: str, model: object, channel: int) -> None:
@@ -172,6 +181,27 @@ def main() -> None:
     try:
         if command == "eq" and _handle_eq_noconnect(parser, mac_arg, model_arg, args):
             return
+
+        # Delegate to the running app via D-Bus when possible (avoids RFCOMM conflict).
+        proxy = get_proxy()
+
+        if proxy is not None:
+            if command == "info":
+                info = proxy_get_info(proxy)
+                if info:
+                    _print_info(info, short=short_flag)
+                    return
+            elif command == "eq" and args and args[0].lower() != "custom":
+                ok = proxy_apply_eq(proxy, args[0])
+                if not ok:
+                    sys.exit("Unexpected response from headset")
+                return
+            elif command == "lang" and args:
+                ok = proxy_apply_language(proxy, args[0].lower())
+                if not ok:
+                    sys.exit("Unexpected response from headset")
+                return
+            # For custom EQ and interactive mode, fall through to direct connection.
 
         mac, model, channel = resolve_headset(mac_arg, model_arg)
 
