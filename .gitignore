@@ -15,6 +15,7 @@ build/
 
 # Captures (large binary files — keep structure, not content)
 data/
+!src/openshokz/data/
 
 # Temp
 /tmp/
