@@ -65,5 +65,12 @@ typeCheckingMode = "standard"
 reportMissingModuleSource = false
 ignore = ["ui", "openshokz_app.py"]
 
+[tool.setuptools]
+packages = ["ui", "scripts", "models"]
+py-modules = ["shokz_config", "openshokz_app", "protocol"]
+
+[tool.setuptools.package-data]
+models = ["*.yaml"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

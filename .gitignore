@@ -1,3 +1,6 @@
+# Superpowers plugin state
+.superpowers/
+
 # Python
 __pycache__/
 *.py[cod]
