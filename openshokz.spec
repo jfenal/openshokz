@@ -10,7 +10,9 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 
 BuildRequires:  python3-devel
+BuildRequires:  python3-pip
 BuildRequires:  python3-setuptools
+BuildRequires:  python3-wheel
 BuildRequires:  python3-pyyaml
 
 Requires:       python3-pyyaml
@@ -46,10 +48,17 @@ for switching EQ presets directly from the system status area.
 %autosetup -n %{name}-%{version}
 
 %build
-%py3_build
+%{python3} -m pip wheel --no-deps --wheel-dir %{_builddir}/wheels .
 
 %install
-%py3_install
+%{python3} -m pip install \
+    --no-index \
+    --find-links %{_builddir}/wheels \
+    --root %{buildroot} \
+    --prefix %{_prefix} \
+    --no-deps \
+    --ignore-installed \
+    openshokz
 
 # Desktop file
 install -Dm644 src/openshokz/data/openshokz.desktop \
@@ -65,10 +74,9 @@ install -m644 gnome-extension/*.js gnome-extension/metadata.json \
 %files
 %doc README.md
 %{python3_sitelib}/openshokz/
-%{python3_sitelib}/openshokz-*.egg-info/
+%{python3_sitelib}/openshokz-*.dist-info/
 %{_bindir}/openshokz
 %{_bindir}/shokz-probe
-# Exclude app entry point from base package
 %exclude %{_bindir}/openshokz-app
 
 %files app
@@ -79,5 +87,5 @@ install -m644 gnome-extension/*.js gnome-extension/metadata.json \
 %{_datadir}/gnome-shell/extensions/openshokz@jfenal.github.com/
 
 %changelog
-* Sun Oct 26 2026 Jérôme Fenal <jfenal@redhat.com> - 0.1.0-1
+* Sun Oct 25 2026 Jérôme Fenal <jfenal@redhat.com> - 0.1.0-1
 - Initial package
